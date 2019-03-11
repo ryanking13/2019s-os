@@ -22,9 +22,9 @@ arch/x86/entry/syscalls/syscall_32.tbl
 
 > _Time is gold, save your time :)_
 
-_python3 needed_
+_python3 is needed_
 
-```
+```sh
 # 커널 빌드 / 부팅 이미지 생성 / USB flash
 
 ./build_kernel.py
@@ -34,7 +34,7 @@ _python3 needed_
 ./build_kernel.py -v -e
 ```
 
-```
+```sh
 # 테스트 파일 빌드 / USB에 파일 업로드
 
 ./build_test.py
@@ -44,7 +44,7 @@ _python3 needed_
 ./build_test.py -v -e
 ```
 
-```
+```sh
 ./comm
 # alias of "screen /dev/ttyUSB0 115200"
 ```
