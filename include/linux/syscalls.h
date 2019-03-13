@@ -80,6 +80,7 @@ union bpf_attr;
 #include <linux/quota.h>
 #include <linux/key.h>
 #include <trace/syscall.h>
+#include <linux/prinfo.h>
 
 /*
  * __MAP - apply a macro to syscall arguments
@@ -941,4 +942,5 @@ asmlinkage long sys_pkey_free(int pkey);
 asmlinkage long sys_statx(int dfd, const char __user *path, unsigned flags,
 			  unsigned mask, struct statx __user *buffer);
 
+int ptree(struct prinfo* buf, int* nr);
 #endif
