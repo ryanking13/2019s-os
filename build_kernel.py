@@ -3,8 +3,10 @@
 import argparse
 import getpass
 import re
+from pathlib import Path
 import subprocess as sp
 import sys
+
 
 def error(msg, **kwargs):
     print('\033[0;31m[-] {}\033[0m'.format(msg), **kwargs)
@@ -84,6 +86,16 @@ def build():
     info ('Flashing use drive...')
     device_name = args.device or find_device_name()
     flash_cmd = './flash-sdcard.sh {}'.format(device_name)
+
+    # Note: `mnt_tmp` is temporary mount path used while flashing
+    #       this directory is removed after flashing, but sometimes remains in whatever reason
+    #       if this directory exists while flashing, flash fails. Therefore, check if it exists and remove it.
+    tmp_mount_path = Path('mnt_tmp')
+    if tmp_mount_path.is_dir():
+        info('mnt_tmp found, removing it...')
+        for f in tmp_mount_path.glob('*'):
+            f.unlink()
+        tmp_mount_path.rmdir()
 
     try:
         p = sp.Popen('yes', stdout=sp.PIPE)
