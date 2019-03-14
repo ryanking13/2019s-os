@@ -7,60 +7,80 @@
 #include <linux/sched/signal.h>
 #include <linux/cred.h>
 #include <linux/uidgid.h>
+#include <linux/slab.h>
 
 int ptree(struct prinfo* buf, int* nr) {
 
     struct task_struct* task;
     // struct list_head* p;
-    int idx = 0;
+    int process_cnt = 0;
     int comm_idx = 0;
+    struct prinfo* _buf; // temp buf
+    struct prinfo* p;
+    int _nr; // temp nr
+    int err;
 
-    // if pointer is null or nr is not positive
-    if (buf == NULL || nr == NULL || *nr < 1) {
-        return -EINVAL;
-    }
+    // if pointer is null, return error
+    if (buf == NULL || nr == NULL) return -EINVAL;
+    // if address of nr is invalid, return error
+    if (!access_ok(VERIFY_WRITE, nr, sizeof(int))) return -EFAULT;
 
-    // if address of pointer is invalid
-    if (!access_ok(VERIFY_WRITE, nr, sizeof(int)) || !access_ok(VERIFY_WRITE, buf, sizeof(struct prinfo) * (*nr))) {
-        return -EFAULT;
-    }
+    get_user(_nr, nr);
+
+    // nr is not positive, return error
+    if (_nr < 1) return -EINVAL;
+    // if address of buf is invalid, return error
+    if (!access_ok(VERIFY_WRITE, buf, sizeof(struct prinfo) * (_nr))) return -EFAULT;
+
+    _buf = (struct prinfo *)kmalloc(sizeof(struct prinfo) * (_nr), GFP_KERNEL);
+    if (!_buf) return -ENOMEM;
 
     // TODO(mk_rd): change traversing order
 
+    p = _buf;
     read_lock(&tasklist_lock);
     for_each_process(task) {
-        if (idx < *nr) {
-            buf->state = (int64_t)task->state;
-            buf->pid = task->pid;
-            buf->parent_pid = task->real_parent->pid;
+        if (process_cnt < _nr) {
+            p->state = (int64_t)task->state;
+            p->pid = task->pid;
+            p->parent_pid = task->parent->pid;
 
             if(list_empty(&task->children)) {
-                buf->first_child_pid = 0;
+                p->first_child_pid = 0;
             } else {
-                buf->first_child_pid = list_first_entry(&task->children, struct task_struct, sibling)->pid;
+                p->first_child_pid = list_first_entry(&task->children, struct task_struct, sibling)->pid;
             }
 
             if (list_empty(&task->sibling)) {
-                buf->next_sibling_pid = 0;
+                p->next_sibling_pid = 0;
             } else { 
-                buf->next_sibling_pid = list_first_entry(&task->sibling, struct task_struct, sibling)->pid;
+                p->next_sibling_pid = list_first_entry(&task->sibling, struct task_struct, sibling)->pid;
             }
 
             // TODO(ddoyoon): check UID is valid
-            buf->uid = (int64_t)__kuid_val(task_uid(task));
+            p->uid = (int64_t)__kuid_val(task_uid(task));
 
             while(*(task->comm + comm_idx) != '\0') {
-                *(buf->comm + comm_idx) = *(task->comm + comm_idx);
+                *(p->comm + comm_idx) = *(task->comm + comm_idx);
                 ++comm_idx;
             }
-            *(buf->comm + comm_idx) = '\0';
+            *(p->comm + comm_idx) = '\0';
             comm_idx = 0;
         }
 
-        ++idx;
-        ++buf;
+        ++process_cnt;
+        ++p;
     }
     read_unlock(&tasklist_lock);
 
-    return idx;
+    // copy temp values to user space
+    err = copy_to_user(buf, _buf, sizeof(struct prinfo) * (_nr));
+    if (err < 0) return err;
+    kfree(_buf);
+
+    // if nr value is bigger than whole process
+    if (process_cnt < _nr) _nr = process_cnt;
+    put_user(_nr, nr);
+
+    return process_cnt;
 }
