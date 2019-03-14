@@ -1,5 +1,3 @@
-#include <linux/types.h>
-
 struct prinfo {
     int64_t state;
     pid_t pid;
