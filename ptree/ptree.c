@@ -25,6 +25,8 @@ int ptree(struct prinfo* buf, int* nr) {
         return -EFAULT;
     }
 
+    // TODO(mk_rd): change traversing order
+
     read_lock(&tasklist_lock);
     for_each_process(task) {
         if (idx < *nr) {
@@ -34,6 +36,8 @@ int ptree(struct prinfo* buf, int* nr) {
 
             buf->first_child_pid = list_last_entry(&task->children, struct task_struct, children)->pid;
             buf->next_sibling_pid = list_first_entry(&task->sibling, struct task_struct, sibling)->pid;
+
+            // TODO(ddoyoon): check UID is valid
             buf->uid = (int64_t)__kuid_val(task_uid(task));
 
             while(*(task->comm + comm_idx) != '\0') {

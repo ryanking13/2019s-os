@@ -8,19 +8,27 @@
 
 #define SYS_ptree 398
 
-int main() {
+int main(int argc, char* argv[]) {
     struct prinfo* p;
     int nr;
     int i;
 
-    printf("nr value: ");
-    scanf("%d", &nr);
+    if (argc == 1) {
+        printf("Usage: ./test_ptree <nr>\n");
+        return 1;
+    } else {
+        nr = atoi(argv[1]);
+    }
+    
+    // TODO(ddoyoon): Add testcase (error handling)
 
     p = (struct prinfo *)malloc(nr * sizeof(struct prinfo));
     printf("[ptree] ptree syscall test\n");
     int ret = syscall(SYS_ptree, p, &nr);
     printf("[ptree] syscall ended with return code %d\n", ret);
 
+    // TODO(ddoyoon): print indented result
+    
     for(i = 0; i < nr; ++i) {
         printf("----- prinfo struct [%d] -----\n", i);
         printf("- Command: %s\n", p[i].comm);
