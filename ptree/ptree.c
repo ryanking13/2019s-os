@@ -34,8 +34,17 @@ int ptree(struct prinfo* buf, int* nr) {
             buf->pid = task->pid;
             buf->parent_pid = task->real_parent->pid;
 
-            buf->first_child_pid = list_last_entry(&task->children, struct task_struct, children)->pid;
-            buf->next_sibling_pid = list_first_entry(&task->sibling, struct task_struct, sibling)->pid;
+            if(list_empty(&task->children)) {
+                buf->first_child_pid = 0;
+            } else {
+                buf->first_child_pid = list_first_entry(&task->children, struct task_struct, sibling)->pid;
+            }
+
+            if (list_empty(&task->sibling)) {
+                buf->next_sibling_pid = 0;
+            } else { 
+                buf->next_sibling_pid = list_first_entry(&task->sibling, struct task_struct, sibling)->pid;
+            }
 
             // TODO(ddoyoon): check UID is valid
             buf->uid = (int64_t)__kuid_val(task_uid(task));
