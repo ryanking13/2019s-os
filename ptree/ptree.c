@@ -57,7 +57,6 @@ int ptree(struct prinfo* buf, int* nr) {
                 p->next_sibling_pid = list_first_entry(&task->sibling, struct task_struct, sibling)->pid;
             }
 
-            // TODO(ddoyoon): check UID is valid
             p->uid = (int64_t)__kuid_val(task_uid(task));
 
             while(*(task->comm + comm_idx) != '\0') {
