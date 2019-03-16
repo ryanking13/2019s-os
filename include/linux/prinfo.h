@@ -1,3 +1,9 @@
+#ifdef __KERNEL__
+#include<linux/types.h>
+#else
+#include<sys/types.h>
+#endif
+
 struct prinfo {
     int64_t state;
     pid_t pid;
