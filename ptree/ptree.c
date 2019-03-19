@@ -12,7 +12,7 @@
 int ptree(struct prinfo* buf, int* nr) {
 
     struct task_struct* task;
-    // struct list_head* p;
+    struct task_struct* next_task;
     int process_cnt = 0;
     int comm_idx = 0;
     struct prinfo* _buf; // temp buf
@@ -38,37 +38,52 @@ int ptree(struct prinfo* buf, int* nr) {
     // TODO(mk_rd): change traversing order
 
     p = _buf;
+
     read_lock(&tasklist_lock);
-    for_each_process(task) {
-        if (process_cnt < _nr) {
-            p->state = (int64_t)task->state;
-            p->pid = task->pid;
-            p->parent_pid = task->parent->pid;
 
-            if(list_empty(&task->children)) {
-                p->first_child_pid = 0;
-            } else {
-                p->first_child_pid = list_first_entry(&task->children, struct task_struct, sibling)->pid;
-            }
-
-            if (list_empty(&task->sibling)) {
-                p->next_sibling_pid = 0;
-            } else { 
-                p->next_sibling_pid = list_first_entry(&task->sibling, struct task_struct, sibling)->pid;
-            }
-
-            p->uid = (int64_t)__kuid_val(task_uid(task));
-
-            while(*(task->comm + comm_idx) != '\0') {
-                *(p->comm + comm_idx) = *(task->comm + comm_idx);
-                ++comm_idx;
-            }
-            *(p->comm + comm_idx) = '\0';
-            comm_idx = 0;
+    task = list_first_entry(&find_task_by_vpid(1)->parent->children, struct task_struct, sibling);
+    while(task->pid && process_cnt < _nr) {
+        p->state = (int64_t)task->state;
+        p->pid = task->pid;
+        p->parent_pid = task->parent->pid;
+        next_task = NULL;
+        
+        if (list_empty(&task->sibling) || task == list_last_entry(&task->sibling,struct task_struct, sibling)) {
+            p->next_sibling_pid = 0;
+        } else {
+            next_task = list_next_entry(task, sibling);
+            p->next_sibling_pid = next_task->pid;
         }
+        
+        if(list_empty(&task->children)) {
+            p->first_child_pid = 0;
+        } else {
+            next_task = list_first_entry(&task->children, struct task_struct, sibling);
+            p->first_child_pid = next_task->pid;
+        }
+
+        p->uid = (int64_t)__kuid_val(task_uid(task));
+
+        while(*(task->comm + comm_idx) != '\0') {
+            *(p->comm + comm_idx) = *(task->comm + comm_idx);
+            ++comm_idx;
+        }
+        *(p->comm + comm_idx) = '\0';
+        comm_idx = 0;
 
         ++process_cnt;
         ++p;
+
+        if(next_task == NULL) {
+            next_task = task;
+            while(next_task->pid && next_task==list_last_entry(&next_task->sibling, struct task_struct, sibling))
+                next_task = next_task->parent;
+            if(next_task->pid) {
+                task = list_next_entry(next_task, sibling);
+                continue;
+            }
+        }
+        task = next_task;
     }
     read_unlock(&tasklist_lock);
 
