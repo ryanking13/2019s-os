@@ -41,11 +41,11 @@ int ptree(struct prinfo* buf, int* nr) {
     p = _buf;
 
     read_lock(&tasklist_lock);
-    task = init_task;
+    task = &init_task;
     do {
         next_task = NULL;
         
-        if (list_empty(&task->sibling) || list_is_last(task->sibling,task->parent->children)) {
+        if (list_empty(&task->sibling) || list_is_last(&task->sibling,&task->parent->children)) {
             if (write_en)
                 p->next_sibling_pid = 0;
         } else {
@@ -82,7 +82,7 @@ int ptree(struct prinfo* buf, int* nr) {
 
         if(next_task == NULL) {
             next_task = task;
-            while(next_task->pid && list_is_last(next_task->sibling, next_task->parent->children))
+            while(next_task->pid && list_is_last(&next_task->sibling, &next_task->parent->children))
                 next_task = next_task->parent;
             if(next_task->pid)
                 next_task = list_next_entry(next_task, sibling);
@@ -90,7 +90,7 @@ int ptree(struct prinfo* buf, int* nr) {
 
         if(write_en && process_cnt >= _nr)
             write_en = 0;
-    } while(((task = next_task)->pid))
+    } while(((task = next_task)->pid));
 
     read_unlock(&tasklist_lock);
 
