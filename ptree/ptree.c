@@ -19,6 +19,7 @@ int ptree(struct prinfo* buf, int* nr) {
     struct prinfo* p;
     int _nr; // temp nr
     int err;
+    int write_en = 1;
 
     // if pointer is null, return error
     if (buf == NULL || nr == NULL) return -EINVAL;
@@ -40,51 +41,57 @@ int ptree(struct prinfo* buf, int* nr) {
     p = _buf;
 
     read_lock(&tasklist_lock);
-
-    task = list_first_entry(&find_task_by_vpid(1)->parent->children, struct task_struct, sibling);
-    while(task->pid && process_cnt < _nr) {
-        p->state = (int64_t)task->state;
-        p->pid = task->pid;
-        p->parent_pid = task->parent->pid;
+    task = init_task;
+    do {
         next_task = NULL;
         
-        if (list_empty(&task->sibling) || task == list_last_entry(&task->sibling,struct task_struct, sibling)) {
-            p->next_sibling_pid = 0;
+        if (list_empty(&task->sibling) || list_is_last(task->sibling,task->parent->children)) {
+            if (write_en)
+                p->next_sibling_pid = 0;
         } else {
             next_task = list_next_entry(task, sibling);
-            p->next_sibling_pid = next_task->pid;
+            if (write_en)
+                p->next_sibling_pid = next_task->pid;
         }
         
         if(list_empty(&task->children)) {
-            p->first_child_pid = 0;
+            if (write_en)
+                p->first_child_pid = 0;
         } else {
             next_task = list_first_entry(&task->children, struct task_struct, sibling);
-            p->first_child_pid = next_task->pid;
+            if (write_en)
+                p->first_child_pid = next_task->pid;
         }
 
-        p->uid = (int64_t)__kuid_val(task_uid(task));
+        if (write_en) {
+            p->uid = (int64_t)__kuid_val(task_uid(task));
+            p->state = (int64_t)task->state;
+            p->pid = task->pid;
+            p->parent_pid = task->parent->pid;
 
-        while(*(task->comm + comm_idx) != '\0') {
-            *(p->comm + comm_idx) = *(task->comm + comm_idx);
-            ++comm_idx;
+            while(*(task->comm + comm_idx) != '\0') {
+                *(p->comm + comm_idx) = *(task->comm + comm_idx);
+                ++comm_idx;
+            }
+            *(p->comm + comm_idx) = '\0';
+            comm_idx = 0;
+            ++p;
         }
-        *(p->comm + comm_idx) = '\0';
-        comm_idx = 0;
 
         ++process_cnt;
-        ++p;
 
         if(next_task == NULL) {
             next_task = task;
-            while(next_task->pid && next_task==list_last_entry(&next_task->sibling, struct task_struct, sibling))
+            while(next_task->pid && list_is_last(next_task->sibling, next_task->parent->children))
                 next_task = next_task->parent;
-            if(next_task->pid) {
-                task = list_next_entry(next_task, sibling);
-                continue;
-            }
+            if(next_task->pid)
+                next_task = list_next_entry(next_task, sibling);
         }
-        task = next_task;
-    }
+
+        if(write_en && process_cnt >= _nr)
+            write_en = 0;
+    } while(((task = next_task)->pid))
+
     read_unlock(&tasklist_lock);
 
     // copy temp values to user space
