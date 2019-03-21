@@ -10,7 +10,7 @@
 #include <linux/slab.h>
 
 int ptree(struct prinfo* buf, int* nr) {
-    printk("[kernel] buf=%p, &nr=%p\n", buf, nr);
+    // printk("[kernel] buf=%p, &nr=%p\n", buf, nr);
 
     struct task_struct* task;
     struct task_struct* next_task;
