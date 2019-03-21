@@ -83,7 +83,7 @@ def build():
         return
         
     # flash usb drive
-    info ('Flashing use drive...')
+    info ('Flashing USB drive...')
     device_name = args.device or find_device_name()
     flash_cmd = './flash-sdcard.sh {}'.format(device_name)
 
