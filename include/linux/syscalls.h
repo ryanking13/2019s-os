@@ -942,5 +942,5 @@ asmlinkage long sys_pkey_free(int pkey);
 asmlinkage long sys_statx(int dfd, const char __user *path, unsigned flags,
 			  unsigned mask, struct statx __user *buffer);
 
-int ptree(struct prinfo* buf, int* nr);
+asmlinkage long sys_ptree(struct prinfo* buf, int* nr);
 #endif

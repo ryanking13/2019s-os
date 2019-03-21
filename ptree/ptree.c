@@ -8,6 +8,7 @@
 #include <linux/cred.h>
 #include <linux/uidgid.h>
 #include <linux/slab.h>
+#include <linux/syscalls.h>
 
 int ptree(struct prinfo* buf, int* nr) {
 
@@ -104,4 +105,9 @@ int ptree(struct prinfo* buf, int* nr) {
     put_user(_nr, nr);
 
     return process_cnt;
+}
+
+SYSCALL_DEFINE2(ptree, struct prinfo*, buf, int*, nr)
+{
+    return (long)ptree(buf, nr);
 }

@@ -4,6 +4,9 @@
 #include<sys/types.h>
 #endif
 
+#ifndef __PRINFO__
+#define __PRINFO__
+
 struct prinfo {
     int64_t state;
     pid_t pid;
@@ -13,3 +16,5 @@ struct prinfo {
     int64_t uid;
     char comm[64];
 };
+
+#endif
