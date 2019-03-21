@@ -10,6 +10,7 @@
 #include <linux/slab.h>
 
 int ptree(struct prinfo* buf, int* nr) {
+    printk("[kernel] buf=%p, &nr=%p\n", buf, nr);
 
     struct task_struct* task;
     struct task_struct* next_task;
@@ -18,25 +19,22 @@ int ptree(struct prinfo* buf, int* nr) {
     struct prinfo* _buf; // temp buf
     struct prinfo* p;
     int _nr; // temp nr
-    int err;
+    int get_nr;
+    int uncopied_bytes;
     int write_en = 1;
 
     // if pointer is null, return error
     if (buf == NULL || nr == NULL) return -EINVAL;
+
     // if address of nr is invalid, return error
-    if (!access_ok(VERIFY_WRITE, nr, sizeof(int))) return -EFAULT;
+    get_nr = get_user(_nr, nr);
+    if (get_nr != 0) return -EFAULT;
 
-    get_user(_nr, nr);
-
-    // nr is not positive, return error
+    // if nr is not positive, return error
     if (_nr < 1) return -EINVAL;
-    // if address of buf is invalid, return error
-    if (!access_ok(VERIFY_WRITE, buf, sizeof(struct prinfo) * (_nr))) return -EFAULT;
 
     _buf = (struct prinfo *)kmalloc(sizeof(struct prinfo) * (_nr), GFP_KERNEL);
     if (!_buf) return -ENOMEM;
-
-    // TODO(mk_rd): change traversing order
 
     p = _buf;
 
@@ -44,7 +42,7 @@ int ptree(struct prinfo* buf, int* nr) {
     task = &init_task;
     do {
         next_task = NULL;
-        
+
         if (list_empty(&task->sibling) || list_is_last(&task->sibling,&task->parent->children)) {
             if (write_en)
                 p->next_sibling_pid = 0;
@@ -53,7 +51,7 @@ int ptree(struct prinfo* buf, int* nr) {
             if (write_en)
                 p->next_sibling_pid = next_task->pid;
         }
-        
+
         if(list_empty(&task->children)) {
             if (write_en)
                 p->first_child_pid = 0;
@@ -95,8 +93,8 @@ int ptree(struct prinfo* buf, int* nr) {
     read_unlock(&tasklist_lock);
 
     // copy temp values to user space
-    err = copy_to_user(buf, _buf, sizeof(struct prinfo) * (_nr));
-    if (err < 0) return err;
+    uncopied_bytes = copy_to_user(buf, _buf, sizeof(struct prinfo) * (_nr));
+    if (uncopied_bytes > 0) return -EFAULT;
     kfree(_buf);
 
     // if nr value is bigger than whole process
