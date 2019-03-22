@@ -19,13 +19,6 @@ int main(int argc, char* argv[]) {
     int ret;
     int* nr_p;
 
-    // if (argc == 1) {
-    //     printf("Usage: ./test_ptree <nr>\n");
-    //     return 1;
-    // } else {
-    //     nr = atoi(argv[1]);
-    // }
-
     printf("[ptree] ptree syscall error handling test\n\n");
 
     printf("Case 1: nr < 1 (-EINVAL)\n");
@@ -86,9 +79,10 @@ int main(int argc, char* argv[]) {
     printf("[ptree] ptree syscall error handling test done\n");
     printf("[ptree] ptree syscall test\n");
 
-    while(1){
+    while (1) {
         printf("nr: ");
         scanf("%d", &nr);
+
         p = (struct prinfo *)malloc(nr * sizeof(struct prinfo));
         ret = syscall(SYS_ptree, p, &nr);
 
@@ -101,37 +95,21 @@ int main(int argc, char* argv[]) {
         pid_t depth[nr];
         int cursor = -1;
 
-        // for(i = 0; i < nr; ++i) {
-        //     printf("----- prinfo struct [%d] -----\n", i);
-        //     printf("- Command: %s\n", p[i].comm);
-        //     printf("- State: %lld\n", p[i].state);
-        //     printf("- PID: %d\n", p[i].pid);
-        //     printf("  - Parent: %d\n", p[i].parent_pid);
-        //     printf("  - Oldest child: %d\n", p[i].first_child_pid);
-        //     printf("  - Younger sibling: %d\n", p[i].next_sibling_pid);
-        //     printf("- UID: %lld\n", p[i].uid);
-        //     printf("------------------------------\n");
-        // }
-
-        for(i = 0; i < nr; ++i) {
-            if(i == 0) {
+        for (i = 0; i < nr; ++i) {
+            if (i == 0) {
                 depth[i] = p[i].pid;
             }
 
-            while(depth[cursor] != p[i].parent_pid && cursor > 0) cursor--;
+            while (depth[cursor] != p[i].parent_pid && cursor > 0) cursor--;
 
             cursor++;
             depth[cursor] = p[i].pid;
 
-            for(int indent = 0; indent < cursor; indent++) printf("\t");
+            for (int indent = 0; indent < cursor; indent++) printf("\t");
             printf("%s,%d,%lld,%d,%d,%d,%lld\n", p[i].comm, p[i].pid, p[i].state, p[i].parent_pid,
                 p[i].first_child_pid, p[i].next_sibling_pid, p[i].uid);
         }
         printf("\n");
         free(p);
-        // pid_t pid;
-        // pid = syscall(SYS_getpid);
-        // printf("[getpid] syscall ended with return code %d\n", pid);
-        // return 0;
     }
 }
