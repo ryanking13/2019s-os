@@ -4,7 +4,7 @@
 
 ## 1. How to build the kernel
 
-기존 방식과 동일하게 빌드 
+기존 방식과 동일하게 빌드
 
 _or_
 
@@ -101,13 +101,30 @@ __(To Be updated)__
 
 ### 2.3. Test code
 
-__(To Be Updated)__
 
-[test/test_ptree.c](./test/ptree.c).
+[test/test_ptree.c](./test/ptree.c)
 
 ```sh
 ./test_ptree
 ```
+- 먼저 5가지 error case 를 test 함
+  - Covered Cases
+    1. `nr` < 1
+    2. `buf` == `NULL`
+    3. `&nr` == `NULL`
+    4. `buf` is outside the accessible address space
+    5. `nr` is outside the accessible address space
+  - Printed Output
+    - Case description and expected error name
+    - `buf`, `&nr` values
+    - Return code of `syscall`
+    - Error message for the `errno` value (using `perror()`)
+- Error testing 후, 사용자로부터 `nr` 값을 입력으로 받아 `syscall` 의 return code 와 해당하는 process tree 를 출력하는 무한루프가 실행됨
+  - Indent 할 tab 의 개수는 `pid_t depth[nr]` 배열과 index cursor 를 사용해 구현함.  `depth[0]=0, cursor=0` 으로 초기화 함
+  - `buf` 에 반환된 결과가 이미 DFS 순으로 정렬되어 있으므로, 각 process 에 대해 아래의 과정을 거침
+    - Move cursor backwards until it points to parent_pid
+    - `cursor++` and `depth[cursor]=process`
+    - Print tab `cursor` times and print the process
 
 ## 3. Process tree investigation
 
