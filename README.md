@@ -91,13 +91,40 @@ sudo ./build_test.py --eject    # eject sdcard after upload
 
 ### 2.2. ptree syscall implementation
 
-__(To Be updated)__
+- `task_struct` structure
+![task_struct](task_struct_structure.png)
+  - each `task_struct` has sibling, parent, and children
+  - `children` and `sibling` can be empty list.
+  - empty list has only dummy head.
 
 - DFS
+  - for `ptree`'s correctness, traversal starts with `init_task(swapper)`
   - kernel space 에서 수행되는 로직임을 고려하여 DFS 구현에 있어 recursion 방식이나 stack을 사용하는 방식 대신 pointer operation으로 구현함
+  - pseudo code
+```
+task = INIT_TASK;
+do 
+{
+    next_task = NULL;
+    p <- (task's information);
+    if ((task->sibling is not empty) && (task is not the last element of task->sibling))
+        next_task = (task's next sibling);
+    if ((task->children is not empty))
+        next_task = (task's first/oldest children);
+    if (next_task == NULL)
+    {
+        next_task = task;
+        while(next_task->pid && (next_task is not the last element of task->sibling))
+            next_task = next_task->parent;
+        if(next_task->pid)
+            next_task = (next_task's next sibling);
+    }
+    task = next_task;
+} while(task->pid);
+```
 
 - Error handling behavior
-  - 비정상 종료시에는 -1을 리턴하고 `errno` 값을 업데이트 함.
+  - 비정상 종료시에는 -1을 리턴하고 `errno` 값을 업데이트 함
 
 ### 2.3. Test code
 
