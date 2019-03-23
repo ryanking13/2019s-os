@@ -127,9 +127,36 @@ __(To Be updated)__
     - Print tab `cursor` times and print the process
 
 ## 3. Process tree investigation
-
-__(To Be Updated)__
+```sh
+swapper/0,0,0,0,1,0,0
+    systemd,1,1,0,147,2,0
+        systemd-journal,147,1,1,0,179,0
+        systemd-udevd,179,1,1,0,237,0
+        ...
+        login,263,1,1,498,264,0
+            bash,498,1,263,505,0,0
+                test_ptree,505,0,498,0,0,0
+        license-manager,264,1,1,0,265,402
+        systemd-logind,265,1,1,0,266,0
+        ...
+    kthreadd,2,1,0,3,0,0
+            kworker/0:0,3,1026,2,0,4,0
+            kworker/0:0H,4,1026,2,0,5,0
+            ...
+```
+- `swapper` (PID 0): System process containing idle threads.
+  - The idle thread does nothing but loop indefinitely, and is always runnable. The idle task has the lowest scheduling priority, so it runs when no other task is runnable. For power management, modern idle threads instruct the executing processor to wait, potentially lowering its clock rate to save power, for it to receive a hardware interrupt that will break the idle thread's infinite loop.
+- `systemd` (PID 1): System and service manager that starts the rest of the system.
+  - `systemd-journal` (PID 160): System service that collects and stores logging data
+  - `systemd-udevd` (PID 203): udev daemon that receives device uevents directly from the kernel whenever a device is added or removed from the system, or it changes its state.
+  - `systemd-logind` (PID 265): System service that manages user logins.
+- `kthreadd` (PID 2): Kernel thread daemon. All kthreads are forked from this thread.
+  - `kworker`: Placeholder process for kernel worker threads.
 
 ## 4. Lessons learned
 
 __(To Be Updated)__
+
+## 5. References
+Bovet, D. P., & Cesati, M. (2005). _Understanding the Linux Kernel: from I/O ports to process management._ " O'Reilly Media, Inc.". 124-125
+https://www.freedesktop.org/software/systemd/man/
