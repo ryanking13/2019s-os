@@ -167,8 +167,8 @@ swapper/0,0,0,0,1,0,0
         systemd-logind,265,1,1,0,266,0
         ...
     kthreadd,2,1,0,3,0,0
-            kworker/0:0,3,1026,2,0,4,0
-            kworker/0:0H,4,1026,2,0,5,0
+        kworker/0:0,3,1026,2,0,4,0
+        kworker/0:0H,4,1026,2,0,5,0
             ...
 ```
 - `swapper` (PID 0): System process containing idle threads.
@@ -182,7 +182,11 @@ swapper/0,0,0,0,1,0,0
 
 ## 4. Lessons learned
 
-__(To Be Updated)__
+- 코드를 수정하고 테스트하기까지의 cycle이 길고, kernel 특성상 디버깅이 어려워 계속되는 trial & error가 어려웠는데, 귀찮은 부분을 자동화하면서 반복되는 부분의 번거로움을 많이 해소할 수 있었음.
+- Linux kernel이 C macro의 특성을 극도로 활용하여 수많은 기능을 구현하고 있음을 알게됨.
+- kernel이라는 특수한 환경에서 수행되는 코드라는 특성을 고려하여 효율적인 자료구조와 알고리즘을 생각해볼 수 있었음.
+- <span style="color: grey">~~_외부 장치와 연결해야 할 때는 가능하면 VM을 쓰지말자._~~</span>
+
 
 ## 5. References
 Bovet, D. P., & Cesati, M. (2005). _Understanding the Linux Kernel: from I/O ports to process management._ " O'Reilly Media, Inc.". 124-125
