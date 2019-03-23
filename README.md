@@ -120,8 +120,8 @@ __(To Be updated)__
     - Return code of `syscall`
     - Error message for the `errno` value (using `perror()`)
 - Error testing 후, 사용자로부터 `nr` 값을 입력으로 받아 `syscall` 의 return code 와 해당하는 process tree 를 출력하는 무한루프가 실행됨
-  - Indent 할 tab 의 개수는 `pid_t depth[nr]` 배열과 index cursor 를 사용해 구현함.  `depth[0]=0, cursor=0` 으로 초기화 함
-  - `buf` 에 반환된 결과가 이미 DFS 순으로 정렬되어 있으므로, 각 process 에 대해 아래의 과정을 거침
+  - Indent 할 tab 의 개수는 `pid_t depth[nr]` 배열과 index cursor 를 사용해 구현함
+  - `buf` 에 반환된 결과가 이미 DFS 순으로 정렬되어 있으므로, `depth[0]=0, cursor=0` 으로 초기화 한 후 각 process 에 대해 아래의 과정을 거침
     - Move cursor backwards until it points to parent_pid
     - `cursor++` and `depth[cursor]=process`
     - Print tab `cursor` times and print the process
