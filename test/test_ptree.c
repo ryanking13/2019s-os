@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
     printf("\n");
 
     printf("Case 5: &nr out of range (-EFAULT)\n");
-    p = (struct prinfo *)malloc(nr * sizeof(struct prinfo));
+    p = (struct prinfo *)malloc(valid_nr * sizeof(struct prinfo));
     nr_p = (int*)0xfffffff0;
     printf("input: buf=%p, &nr=%p\n", p, nr_p);
     ret = syscall(SYS_ptree, p, nr_p);
@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
         printf("[ptree] syscall ended with return code %d\n", ret);
-
+        printf("[ptree] nr = %d\n", nr);
         pid_t depth[nr];
         int cursor = -1;
 
