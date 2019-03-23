@@ -20,7 +20,7 @@ int ptree(struct prinfo* buf, int* nr) {
     struct prinfo* _buf; // temp buf
     struct prinfo* p;
     int _nr; // temp nr
-    int get_nr;
+    int get_put_nr;
     int uncopied_bytes;
     int write_en = 1;
 
@@ -28,8 +28,8 @@ int ptree(struct prinfo* buf, int* nr) {
     if (buf == NULL || nr == NULL) return -EINVAL;
 
     // if address of nr is invalid, return error
-    get_nr = get_user(_nr, nr);
-    if (get_nr != 0) return -EFAULT;
+    get_put_nr = get_user(_nr, nr);
+    if (get_put_nr != 0) return -EFAULT;
 
     // if nr is not positive, return error
     if (_nr < 1) return -EINVAL;
@@ -100,7 +100,8 @@ int ptree(struct prinfo* buf, int* nr) {
 
     // if nr value is bigger than whole process
     if (process_cnt < _nr) _nr = process_cnt;
-    put_user(_nr, nr);
+    get_put_nr = put_user(_nr, nr);
+    if (get_put_nr != 0) return -EFAULT;
 
     return process_cnt;
 }
