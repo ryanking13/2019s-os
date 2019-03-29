@@ -1,5 +1,8 @@
+#include <linux/kernel.h>
+#include <linux/slab.h>
 #include <linux/syscalls.h>
 #include <linux/rotation.h>
+#include <linux/list.h>
 
 // TODO: user memory -> kernel memory copy
 
@@ -20,7 +23,7 @@ long set_rotation(int degree) { /* 0 <= degree < 360 */
         4. awake selected readers/writer
     */
     rotation_unlock(rot);
-
+    // TODO: handle process die auto unlocking
     return 0;
 }
 
@@ -31,8 +34,45 @@ long set_rotation(int degree) { /* 0 <= degree < 360 */
  */
 long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 180 */
     rotation_state *rot = &init_rotation;
+    rotation_lock_list* lock_entry;
+
+    // memory for new entry must be allocated here outside of lock
+    rotation_lock_list* new_lock_entry = (rotation_lock_list *)kmalloc(sizeof(rotation_lock_list), GFP_KERNEL);
+    int flag = 0;
+    DECLARE_WAIT_QUEUE_HEAD(queue);
+    new_lock_entry->degree = degree;
+    new_lock_entry->range = range;
+    new_lock_entry->flag = &flag;
+    new_lock_entry->queue = &queue;
+    INIT_LIST_HEAD(&new_lock_entry->lock_list);
 
     rotation_lock(rot);
+    list_for_each_entry(lock_entry, &rot->write_lock_wait_list.lock_list, lock_list) {
+        if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
+            rotation_unlock(rot);
+            kfree(new_lock_entry); // not queued, so free it here
+            return -1;
+        }
+    }
+
+    list_for_each_entry(lock_entry, &rot->write_lock_list.lock_list, lock_list) {
+        if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
+            list_add(&rot->read_lock_wait_list.lock_list, &new_lock_entry->lock_list);
+            rotation_unlock(rot);
+            return 0;            
+        }
+    }
+
+    if (is_device_in_lock_range(degree, range, rot)) {
+        list_add(&rot->read_lock_wait_list.lock_list, &new_lock_entry->lock_list);
+        rotation_unlock(rot);
+        return 0;
+    }
+
+    list_add(&rot->read_lock_list.lock_list, &new_lock_entry->lock_list);
+    rotation_unlock(rot);
+    return 0;
+
     // for writer_wait_list
     //     if there is overlapping lock, fail
     // for writer_list
@@ -41,7 +81,6 @@ long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 1
     //     queue this thread
     // else
     //     take a reader lock and run this thread
-    rotation_unlock(rot);
 
     /* TODO
         1. NO_BLOCK CASE (device must be in LOCK_RANGE)
@@ -56,8 +95,6 @@ long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 1
         3. FAIL_CASE
             3.1. if writer in overlapping range is waiting, it fails.
     */
-
-    return 0;
 }
 long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= degree + range */
     rotation_state *rot = &init_rotation;
