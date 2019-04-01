@@ -5,21 +5,13 @@
 #include <linux/list.h>
 #include <linux/wait.h>
 
-// TODO: user memory -> kernel memory copy
+// TODO: handle process die auto unlocking
 
-/*
- * sets the current device rotation in the kernel.
- * syscall number 398 (you may want to check this number!)
- */
-long set_rotation(int degree) { /* 0 <= degree < 360 */
-    rotation_state *rot = &init_rotation;
+int wake_up_wait_list(rotation_state *rot) {
     rotation_lock_list* lock_entry;
     rotation_lock_list* _lock_entry; // temporary storage for list_for_each_entry_safe
     int reader_holding = 0;
     int unlocked = 0;
-
-    rotation_lock(rot);
-    rotation_set_degree(rot, degree);
 
     // if there is a writer holding a lock in current degree,
     // no release so nothing happens
@@ -65,7 +57,6 @@ long set_rotation(int degree) { /* 0 <= degree < 360 */
         }
     }
 
-    rotation_unlock(rot);
     return unlocked;
 
     /*
@@ -75,8 +66,22 @@ long set_rotation(int degree) { /* 0 <= degree < 360 */
         3. select reader's' or writer to give lock
         4. awake selected readers/writer
     */
+}
 
-    // TODO: handle process die auto unlocking
+/*
+ * sets the current device rotation in the kernel.
+ * syscall number 398 (you may want to check this number!)
+ */
+long set_rotation(int degree) { /* 0 <= degree < 360 */
+    rotation_state *rot = &init_rotation;
+    int unlocked = 0;
+
+    rotation_lock(rot);
+    rotation_set_degree(rot, degree);
+    unlocked = wake_up_wait_list(rot);
+    rotation_unlock(rot);
+
+    return unlocked;
 }
 
 /*
@@ -102,6 +107,7 @@ long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 1
     new_lock_entry->range = range;
     new_lock_entry->flag = &flag;
     new_lock_entry->queue = &queue;
+    new_lock_entry->task_struct = current;
     INIT_LIST_HEAD(&new_lock_entry->lock_list);
 
     rotation_lock(rot);
@@ -110,6 +116,7 @@ long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 1
     if (!is_device_in_lock_range(degree, range, rot)) {
         list_add_tail(&rot->read_lock_wait_list.lock_list, &new_lock_entry->lock_list);
         rotation_unlock(rot);
+        wait_event_interruptible(queue, (flag == 1));
         return 0;
     }
 
@@ -119,6 +126,7 @@ long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 1
         if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
             list_add_tail(&rot->read_lock_wait_list.lock_list, &new_lock_entry->lock_list);
             rotation_unlock(rot);
+            wait_event_interruptible(queue, (flag == 1));
             return 0;
         }
     }
@@ -129,6 +137,7 @@ long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 1
         if (is_lock_ranges_overlap(lock_entry, new_lock_entry)) {
             list_add_tail(&rot->read_lock_wait_list.lock_list, &new_lock_entry->lock_list);
             rotation_unlock(rot);
+            wait_event_interruptible(queue, (flag == 1));
             return 0;            
         }
     }
@@ -178,6 +187,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
     new_lock_entry->range = range;
     new_lock_entry->flag = &flag;
     new_lock_entry->queue = &queue;
+    new_lock_entry->task_struct = current;
     INIT_LIST_HEAD(&new_lock_entry->lock_list);
 
     rotation_lock(rot);
@@ -186,6 +196,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
     if (!is_device_in_lock_range(degree, range, rot)) {
         list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
         rotation_unlock(rot);
+        wait_event_interruptible(queue, (flag == 1));
         return 0;
     }
 
@@ -195,6 +206,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
         if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
             list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
             rotation_unlock(rot);
+            wait_event_interruptible(queue, (flag == 1));
             return 0;
         }
     }
@@ -205,6 +217,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
         if (is_lock_ranges_overlap(lock_entry, new_lock_entry)) {
             list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
             rotation_unlock(rot);
+            wait_event_interruptible(queue, (flag == 1));
             return 0;            
         }
     }
@@ -215,6 +228,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
         if (is_lock_ranges_overlap(lock_entry, new_lock_entry)) {
             list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
             rotation_unlock(rot);
+            wait_event_interruptible(queue, (flag == 1));
             return 0;            
         }
     }
@@ -253,21 +267,73 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
  */
 long rotunlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 180 */
     rotation_state *rot = &init_rotation;
+    rotation_lock_list* lock_entry;
+    rotation_lock_list* _lock_entry; // temporary storage for list_for_each_entry_safe
+    struct task_struct *cur;
+    int unlocked = 0;
 
+    // invalid degree / range
+    if (!(0 <= degree && degree < 360) || !(0 < range && range < 180)) {
+        return -1;
+    }
+
+    cur = current;
     rotation_lock(rot);
-    // remove this thread from reader list
-    // then, same as set_rotation
+    list_for_each_entry_safe(lock_entry, _lock_entry, &rot->read_lock_list.lock_list, lock_list) {
+        if (lock_entry->task_struct->tgid == cur->tgid &&\
+            lock_entry->degree == degree && lock_entry->range == range) {
+            list_del(&lock_entry->lock_list);
+            kfree(lock_entry);
+            wake_up_wait_list(rot);
+            unlocked = 1;
+        }
+    }
+
     rotation_unlock(rot);
+
+    // there was no lock to unlock (invalid case), return -1
+    if (!unlocked)
+        return -1;
+
     return 0;
+
+    // remove this thread from reader list
+    // then, same as what set_rotation do
 }
 long rotunlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= degree + range */
     rotation_state *rot = &init_rotation;
+    rotation_lock_list* lock_entry;
+    rotation_lock_list* _lock_entry; // temporary storage for list_for_each_entry_safe
+    struct task_struct *cur;
+    int unlocked = 0;
 
+    // invalid degree / range
+    if (!(0 <= degree && degree < 360) || !(0 < range && range < 180)) {
+        return -1;
+    }
+
+    cur = current;
     rotation_lock(rot);
-    // remove this thread from reader list
-    // then, same as set_rotation
+    list_for_each_entry_safe(lock_entry, _lock_entry, &rot->write_lock_list.lock_list, lock_list) {
+        if (lock_entry->task_struct->tgid == cur->tgid &&\
+            lock_entry->degree == degree && lock_entry->range == range) {
+            list_del(&lock_entry->lock_list);
+            kfree(lock_entry);
+            wake_up_wait_list(rot);
+            unlocked = 1;
+        }
+    }
+
     rotation_unlock(rot);
+
+    // there was no lock to unlock (invalid case), return -1
+    if (!unlocked)
+        return -1;
+
     return 0;
+
+    // remove this thread from reader list
+    // then, same as what set_rotation do
 }
 
 SYSCALL_DEFINE1(set_rotation, int, degree)
