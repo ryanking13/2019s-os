@@ -6,6 +6,7 @@
 #include <linux/list.h>
 #include <linux/export.h>
 #include <linux/wait.h>
+#include <linux/sched.h>
 
 /* ===== rotation_state struct related ===== */
 
@@ -31,6 +32,7 @@ typedef struct {
     int *flag;  // flag for wait_event
     wait_queue_head_t *queue; // wait_event_head that holds this process
     struct list_head lock_list;
+    struct task_struct *task_struct;
 } rotation_lock_list;
 
 typedef struct {
