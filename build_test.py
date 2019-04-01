@@ -73,6 +73,8 @@ def build():
         _exec('mount {device} {path}'.format(device='tizen-image/rootfs.img', path=tmp_dir), shell=True)
 
         try:
+            # make file system writable
+            _exec('sed -i \'s/defaults,noatime,ro/defaults,noatime/\' {path}/etc/fstab'.format(path=tmp_dir), shell=True)
             _exec('cp test/* {path}/root/'.format(path=tmp_dir), shell=True)
         except sp.CalledProcessError as e:
             error('copy failed with return code {}'.format(e.returncode))
