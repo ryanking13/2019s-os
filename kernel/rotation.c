@@ -3,6 +3,7 @@
 #include <linux/syscalls.h>
 #include <linux/rotation.h>
 #include <linux/list.h>
+#include <linux/wait.h>
 
 // TODO: user memory -> kernel memory copy
 
@@ -12,19 +13,70 @@
  */
 long set_rotation(int degree) { /* 0 <= degree < 360 */
     rotation_state *rot = &init_rotation;
+    rotation_lock_list* lock_entry;
+    rotation_lock_list* _lock_entry; // temporary storage for list_for_each_entry_safe
+    int reader_holding = 0;
+    int unlocked = 0;
 
     rotation_lock(rot);
     rotation_set_degree(rot, degree);
-    /* TODO
-        0. check if there some reader/writer is hold a lock for current degree, if so, nothing happens
+
+    // if there is a writer holding a lock in current degree,
+    // no release so nothing happens
+    list_for_each_entry(lock_entry, &rot->write_lock_list.lock_list, lock_list) {
+        if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
+            rotation_unlock(rot);
+            return 0;
+        }
+    }
+
+    // if there is a writer holding a lock in current degree,
+    // other readers can hold that lock.
+    list_for_each_entry(lock_entry, &rot->read_lock_list.lock_list, lock_list) {
+        if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
+            reader_holding = 1;
+        }
+    }
+
+    // if reader is not holding a lock, then iterate through waiting writers
+    // and release very first wating lock where lock range overlaps current degree
+    if(!reader_holding) {
+        list_for_each_entry_safe(lock_entry, _lock_entry, &rot->write_lock_wait_list.lock_list, lock_list) {
+            if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
+                unlocked += 1;
+                lock_entry->flag = 0;
+                wake_up_interruptible(lock_entry->queue);
+                list_del(&lock_entry->lock_list);
+                kfree(lock_entry);
+
+                rotation_unlock(rot);
+                return unlocked;
+            }
+        }
+    }
+
+    list_for_each_entry_safe(lock_entry, _lock_entry, &rot->read_lock_wait_list.lock_list, lock_list) {
+        if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
+            unlocked += 1;
+            lock_entry->flag = 0;
+            wake_up_interruptible(lock_entry->queue);
+            list_del(&lock_entry->lock_list);
+            kfree(lock_entry);
+        }
+    }
+
+    rotation_unlock(rot);
+    return unlocked;
+
+    /*
+        0. check if there some writer is hold a lock for current degree, if so, nothing happens
         1. check if there are waiting readers
         2. check if there are waiting writers
         3. select reader's' or writer to give lock
         4. awake selected readers/writer
     */
-    rotation_unlock(rot);
+
     // TODO: handle process die auto unlocking
-    return 0;
 }
 
 /*
@@ -35,11 +87,17 @@ long set_rotation(int degree) { /* 0 <= degree < 360 */
 long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 180 */
     rotation_state *rot = &init_rotation;
     rotation_lock_list* lock_entry;
-
-    // memory for new entry must be allocated here outside of lock
-    rotation_lock_list* new_lock_entry = (rotation_lock_list *)kmalloc(sizeof(rotation_lock_list), GFP_KERNEL);
+    rotation_lock_list* new_lock_entry;
     int flag = 0;
     DECLARE_WAIT_QUEUE_HEAD(queue);
+
+    // invalid degree / range
+    if (!(0 <= degree && degree < 360) || !(0 < range && range < 180)) {
+        return -1;
+    }
+
+    // memory for new entry must be allocated here outside of lock
+    new_lock_entry = (rotation_lock_list *)kmalloc(sizeof(rotation_lock_list), GFP_KERNEL);
     new_lock_entry->degree = degree;
     new_lock_entry->range = range;
     new_lock_entry->flag = &flag;
@@ -47,38 +105,44 @@ long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 1
     INIT_LIST_HEAD(&new_lock_entry->lock_list);
 
     rotation_lock(rot);
+
+    // device is not in lock range, queue this process to wait list
+    if (!is_device_in_lock_range(degree, range, rot)) {
+        list_add_tail(&rot->read_lock_wait_list.lock_list, &new_lock_entry->lock_list);
+        rotation_unlock(rot);
+        return 0;
+    }
+
+    // if there is a waiting write lock where lock range overlapps current device rotation
+    // queue this process to wait list
     list_for_each_entry(lock_entry, &rot->write_lock_wait_list.lock_list, lock_list) {
         if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
+            list_add_tail(&rot->read_lock_wait_list.lock_list, &new_lock_entry->lock_list);
             rotation_unlock(rot);
-            kfree(new_lock_entry); // not queued, so free it here
-            return -1;
+            return 0;
         }
     }
 
+    // if there is a write lock holding lock where lock range overlapps new lock
+    // queue this process to wait list 
     list_for_each_entry(lock_entry, &rot->write_lock_list.lock_list, lock_list) {
-        if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
-            list_add(&rot->read_lock_wait_list.lock_list, &new_lock_entry->lock_list);
+        if (is_lock_ranges_overlap(lock_entry, new_lock_entry)) {
+            list_add_tail(&rot->read_lock_wait_list.lock_list, &new_lock_entry->lock_list);
             rotation_unlock(rot);
             return 0;            
         }
-    }
-
-    if (is_device_in_lock_range(degree, range, rot)) {
-        list_add(&rot->read_lock_wait_list.lock_list, &new_lock_entry->lock_list);
-        rotation_unlock(rot);
-        return 0;
     }
 
     list_add(&rot->read_lock_list.lock_list, &new_lock_entry->lock_list);
     rotation_unlock(rot);
     return 0;
 
-    // for writer_wait_list
-    //     if there is overlapping lock, fail
-    // for writer_list
-    //     if there is overlapping lock, queue this thread
     // if not in LOCK_RANGE
     //     queue this thread
+    // for writer_wait_list
+    //     if there is waiting lock in current rotation, queue this thread
+    // for writer_list
+    //     if there is overlapping lock, queue this thread
     // else
     //     take a reader lock and run this thread
 
@@ -93,23 +157,83 @@ long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 1
         2. BLOCK_CASE
             2.1. add this thread to wait_list and go sleep.
         3. FAIL_CASE
-            3.1. if writer in overlapping range is waiting, it fails.
+            3.1. wrong degree / range
     */
 }
 long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= degree + range */
     rotation_state *rot = &init_rotation;
+    rotation_lock_list* lock_entry;
+    rotation_lock_list* new_lock_entry;
+    int flag = 0;
+    DECLARE_WAIT_QUEUE_HEAD(queue);
+
+    // invalid degree / range
+    if (!(0 <= degree && degree < 360) || !(0 < range && range < 180)) {
+        return -1;
+    }
+
+    // memory for new entry must be allocated here outside of lock
+    new_lock_entry = (rotation_lock_list *)kmalloc(sizeof(rotation_lock_list), GFP_KERNEL);
+    new_lock_entry->degree = degree;
+    new_lock_entry->range = range;
+    new_lock_entry->flag = &flag;
+    new_lock_entry->queue = &queue;
+    INIT_LIST_HEAD(&new_lock_entry->lock_list);
 
     rotation_lock(rot);
+
+    // device is not in lock range, queue this process to wait list
+    if (!is_device_in_lock_range(degree, range, rot)) {
+        list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
+        rotation_unlock(rot);
+        return 0;
+    }
+
+    // if there is a waiting write lock where lock range overlapps current device rotation
+    // queue this process to wait list
+    list_for_each_entry(lock_entry, &rot->write_lock_wait_list.lock_list, lock_list) {
+        if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
+            list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
+            rotation_unlock(rot);
+            return 0;
+        }
+    }
+
+    // if there is a write lock holding lock where lock range overlapps new lock
+    // queue this process to wait list 
+    list_for_each_entry(lock_entry, &rot->write_lock_list.lock_list, lock_list) {
+        if (is_lock_ranges_overlap(lock_entry, new_lock_entry)) {
+            list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
+            rotation_unlock(rot);
+            return 0;            
+        }
+    }
+
+    // if there is a write lock holding lock where lock range overlapps new lock
+    // queue this process to wait list 
+    list_for_each_entry(lock_entry, &rot->read_lock_list.lock_list, lock_list) {
+        if (is_lock_ranges_overlap(lock_entry, new_lock_entry)) {
+            list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
+            rotation_unlock(rot);
+            return 0;            
+        }
+    }
+
+    list_add(&rot->write_lock_list.lock_list, &new_lock_entry->lock_list);
+    rotation_unlock(rot);
+    return 0;
+
+
+    // if not in LOCK_RANGE
+    //     queue this thread
     // for writer_list
     //     if there is overlapping lock, queue this thread
     // for reader_list
     //     if there is overlapping lock, queue this thread
-    // if not in LOCK_RANGE
-    //     queue this thread
     // else
     //     take a writer lock and run this thread
-    rotation_unlock(rot);
-    /* TODO
+
+    /*
         1. NO_BLOCK CASE (device must be in LOCK_RANGE)
             1.1. no other thread is holding a lock.
             1.2. other threads are holding a lock.
@@ -117,7 +241,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
         2. BLOCK_CASE
             2.1. add this thread to wait_list and go sleep.
         3. FAIL_CASE
-            3.1. maybe no fail case?
+            3.1. wrong degree / range
     */
     return 0;
 }
