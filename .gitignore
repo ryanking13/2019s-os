@@ -101,7 +101,4 @@ modules.img
 test/*
 !/test/*.c
 
-tizen-image/boot.img
-tizen-image/modules.img
-tizen-image/rootfs.img
-tizen-image/system-data.img
+*.img

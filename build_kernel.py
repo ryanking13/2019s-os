@@ -79,7 +79,10 @@ def build():
 
     if args.qemu:
         info('Copying boot images for qemu...')
-        copy_cmd = 'cp *.img tizen-image/'
+        p = Path('tizen-image')
+        if not p.exists():
+            p.mkdir()
+        copy_cmd = 'tar -xvf tizen-unified_20181024.1_iot-headless-2parts-armv7l-rpi3.tar.gz && cp *.img tizen-image/'
         _exec(copy_cmd, shell=True)
 
     info('Packing boot image...')
