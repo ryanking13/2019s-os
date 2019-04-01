@@ -59,13 +59,28 @@ inline void rotation_set_degree(rotation_state* rot, int degree) {
 }
 
 inline int is_device_in_lock_range(int degree, int range, rotation_state* rot) {
-    // TODO: check if rotation is inside LOCK RANGE
-    return 1;
+    int diff_cw = abs(rot->degree - degree);
+    int diff_ccw = 360 - diff_cw;
+
+    if (diff_cw <= range || diff_ccw <= range)
+        return 1;
+
+    return 0;
 }
 
 inline int is_device_in_lock_range_of_lock_entry(rotation_lock_list* entry, rotation_state* rot) {
-    // TODO: check if rotation is inside nodes' LOCK RANGE
-    return 1;
+    return is_device_in_lock_range(entry->degree, entry->range, rot);
+}
+
+inline int is_lock_ranges_overlap(rotation_lock_list* p, rotation_lock_list* q) {
+    int diff_cw = abs(p->degree -  q->degree);
+    int diff_ccw = 360 - diff_cw;
+    int range = p->range + q->range;
+
+    if (diff_cw <= range || diff_ccw <= range)
+        return 1;
+
+    return 0;
 }
 
 /* ===== rotation_state struct related ===== */
