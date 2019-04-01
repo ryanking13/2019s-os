@@ -43,6 +43,8 @@ def parse_args():
                         help='do not flash kernel to USB, just build and exit')
     parser.add_argument('--device', default=None,
                         help='force device path (e.g. /dev/sdb), use this argument if device is not automatically detected')
+    parser.add_argument('--qemu', action='store_true',
+                        help='generate boot images for qemu')
     
     args = parser.parse_args()
     return args
@@ -74,6 +76,11 @@ def build():
     except sp.CalledProcessError as e:
         error('{} failed with return code {}'.format(gen_boot_img_cmd, e.returncode))
         exit(1)
+
+    if args.qemu:
+        info('Copying boot images for qemu...')
+        copy_cmd = 'cp *.img tizen-image/'
+        _exec(copy_cmd, shell=True)
 
     info('Packing boot image...')
     pack_cmd = 'tar -zcvf tizen-unified_20181024.1_iot-boot-arm64-rpi3.tar.gz boot.img modules.img' 
