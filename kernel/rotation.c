@@ -7,6 +7,7 @@
 
 // TODO: handle process die auto unlocking
 
+/* iterate through waiting lock list and wake up if in valid range */
 int wake_up_wait_list(rotation_state *rot) {
     rotation_lock_list* lock_entry;
     rotation_lock_list* _lock_entry; // temporary storage for list_for_each_entry_safe
@@ -17,7 +18,6 @@ int wake_up_wait_list(rotation_state *rot) {
     // no release so nothing happens
     list_for_each_entry(lock_entry, &rot->write_lock_list.lock_list, lock_list) {
         if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
-            rotation_unlock(rot);
             return 0;
         }
     }
@@ -36,12 +36,10 @@ int wake_up_wait_list(rotation_state *rot) {
         list_for_each_entry_safe(lock_entry, _lock_entry, &rot->write_lock_wait_list.lock_list, lock_list) {
             if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
                 unlocked += 1;
-                lock_entry->flag = 0;
+                *lock_entry->flag = 1;
                 wake_up_interruptible(lock_entry->queue);
                 list_del(&lock_entry->lock_list);
                 kfree(lock_entry);
-
-                rotation_unlock(rot);
                 return unlocked;
             }
         }
@@ -50,7 +48,7 @@ int wake_up_wait_list(rotation_state *rot) {
     list_for_each_entry_safe(lock_entry, _lock_entry, &rot->read_lock_wait_list.lock_list, lock_list) {
         if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
             unlocked += 1;
-            lock_entry->flag = 0;
+            *lock_entry->flag = 1;
             wake_up_interruptible(lock_entry->queue);
             list_del(&lock_entry->lock_list);
             kfree(lock_entry);
@@ -66,6 +64,37 @@ int wake_up_wait_list(rotation_state *rot) {
         3. select reader's' or writer to give lock
         4. awake selected readers/writer
     */
+}
+
+/* release locks on die */
+void release_locks_on_die(void) {
+    // TODO: this function is not tested
+    rotation_state *rot = &init_rotation;
+    rotation_lock_list* lock_entry;
+    rotation_lock_list* _lock_entry; // temporary storage for list_for_each_entry_safe
+    struct task_struct *cur;
+
+    cur = current;
+    rotation_lock(rot);
+
+    list_for_each_entry_safe(lock_entry, _lock_entry, &rot->write_lock_list.lock_list, lock_list) {
+        if (lock_entry->task_struct->tgid == cur->tgid) {
+            list_del(&lock_entry->lock_list);
+            kfree(lock_entry);
+            
+        }
+    }
+
+    list_for_each_entry_safe(lock_entry, _lock_entry, &rot->read_lock_list.lock_list, lock_list) {
+        if (lock_entry->task_struct->tgid == cur->tgid) {
+            list_del(&lock_entry->lock_list);
+            kfree(lock_entry);
+        }
+    }
+
+    wake_up_wait_list(rot);
+    rotation_unlock(rot);
+    return;
 }
 
 /*
@@ -142,7 +171,7 @@ long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 1
         }
     }
 
-    list_add(&rot->read_lock_list.lock_list, &new_lock_entry->lock_list);
+    list_add_tail(&rot->read_lock_list.lock_list, &new_lock_entry->lock_list);
     rotation_unlock(rot);
     return 0;
 
@@ -194,6 +223,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
 
     // device is not in lock range, queue this process to wait list
     if (!is_device_in_lock_range(degree, range, rot)) {
+        printk(KERN_INFO "[rotlock_write] rotation not in lock range: %d\n", rot->degree);
         list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
         rotation_unlock(rot);
         wait_event_interruptible(queue, (flag == 1));
@@ -204,6 +234,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
     // queue this process to wait list
     list_for_each_entry(lock_entry, &rot->write_lock_wait_list.lock_list, lock_list) {
         if (is_device_in_lock_range_of_lock_entry(lock_entry, rot)) {
+            printk(KERN_INFO "[rotlock_write] there is other waiting write lock: %d\n", rot->degree);
             list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
             rotation_unlock(rot);
             wait_event_interruptible(queue, (flag == 1));
@@ -215,6 +246,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
     // queue this process to wait list 
     list_for_each_entry(lock_entry, &rot->write_lock_list.lock_list, lock_list) {
         if (is_lock_ranges_overlap(lock_entry, new_lock_entry)) {
+            printk(KERN_INFO "[rotlock_write] waiting other write lock: %d\n", rot->degree);
             list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
             rotation_unlock(rot);
             wait_event_interruptible(queue, (flag == 1));
@@ -226,6 +258,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
     // queue this process to wait list 
     list_for_each_entry(lock_entry, &rot->read_lock_list.lock_list, lock_list) {
         if (is_lock_ranges_overlap(lock_entry, new_lock_entry)) {
+            printk(KERN_INFO "[rotlock_write] waiting other read lock: %d\n", rot->degree);
             list_add_tail(&rot->write_lock_wait_list.lock_list, &new_lock_entry->lock_list);
             rotation_unlock(rot);
             wait_event_interruptible(queue, (flag == 1));
@@ -233,7 +266,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
         }
     }
 
-    list_add(&rot->write_lock_list.lock_list, &new_lock_entry->lock_list);
+    list_add_tail(&rot->write_lock_list.lock_list, &new_lock_entry->lock_list);
     rotation_unlock(rot);
     return 0;
 
