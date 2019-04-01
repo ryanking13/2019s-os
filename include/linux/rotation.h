@@ -7,6 +7,7 @@
 #include <linux/export.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <linux/mutex.h>
 
 /* ===== rotation_state struct related ===== */
 
@@ -23,7 +24,8 @@
     .read_lock_wait_list = INIT_ROTATION_LOCK_LIST(_name.read_lock_wait_list, -1, -1, NULL, NULL),\
     .write_lock_wait_list = INIT_ROTATION_LOCK_LIST(_name.write_lock_wait_list, -1, -1, NULL, NULL),\
     .read_lock_list = INIT_ROTATION_LOCK_LIST(_name.read_lock_list, -1, -1, NULL, NULL),\
-    .write_lock_list = INIT_ROTATION_LOCK_LIST(_name.write_lock_list, -1, -1, NULL, NULL)\
+    .write_lock_list = INIT_ROTATION_LOCK_LIST(_name.write_lock_list, -1, -1, NULL, NULL),\
+    .lock = __MUTEX_INITIALIZER(_name.lock)\
 }
 
 typedef struct {
@@ -41,7 +43,8 @@ typedef struct {
     rotation_lock_list write_lock_wait_list;
     rotation_lock_list read_lock_list;
     rotation_lock_list write_lock_list;
-    spinlock_t lock; // TODO: change it to mutex??
+    // spinlock_t lock; // TODO: change it to mutex??
+    struct mutex lock;
 } rotation_state;
 
 /* global rotation_state struct */
@@ -49,11 +52,13 @@ rotation_state init_rotation = INIT_ROTATION_STATE(init_rotation);
 EXPORT_SYMBOL(init_rotation);
 
 inline void rotation_lock(rotation_state* rot) {
-    spin_lock(&rot->lock);
+    // spin_lock(&rot->lock);
+    mutex_lock(&rot->lock);
 }
 
 inline void rotation_unlock(rotation_state* rot) {
-    spin_unlock(&rot->lock);
+    // spin_unlock(&rot->lock);
+    mutex_unlock(&rot->lock);
 }
 
 inline void rotation_set_degree(rotation_state* rot, int degree) {
