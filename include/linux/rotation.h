@@ -11,28 +11,27 @@
 
 /* ===== rotation_state struct related ===== */
 
-#define INIT_ROTATION_LOCK_LIST(_name, _degree, _range, _flag, _queue) {\
+#define INIT_ROTATION_LOCK_LIST(_name, _degree, _range, _flag) {\
     .degree = _degree,\
     .range = _range,\
     .flag = _flag,\
-    .queue = _queue,\
     .lock_list = LIST_HEAD_INIT(_name.lock_list)\
 }
 
 #define INIT_ROTATION_STATE(_name) {\
     .degree = -1,\
-    .read_lock_wait_list = INIT_ROTATION_LOCK_LIST(_name.read_lock_wait_list, -1, -1, NULL, NULL),\
-    .write_lock_wait_list = INIT_ROTATION_LOCK_LIST(_name.write_lock_wait_list, -1, -1, NULL, NULL),\
-    .read_lock_list = INIT_ROTATION_LOCK_LIST(_name.read_lock_list, -1, -1, NULL, NULL),\
-    .write_lock_list = INIT_ROTATION_LOCK_LIST(_name.write_lock_list, -1, -1, NULL, NULL),\
+    .read_lock_wait_list = INIT_ROTATION_LOCK_LIST(_name.read_lock_wait_list, -1, -1, 0),\
+    .write_lock_wait_list = INIT_ROTATION_LOCK_LIST(_name.write_lock_wait_list, -1, -1, 0),\
+    .read_lock_list = INIT_ROTATION_LOCK_LIST(_name.read_lock_list, -1, -1, 0),\
+    .write_lock_list = INIT_ROTATION_LOCK_LIST(_name.write_lock_list, -1, -1, 0),\
     .lock = __MUTEX_INITIALIZER(_name.lock)\
 }
 
 typedef struct {
     int degree;
     int range;
-    int *flag;  // flag for wait_event
-    wait_queue_head_t *queue; // wait_event_head that holds this process
+    int flag;  // flag for wait_event
+    wait_queue_head_t queue; // wait_event_head that holds this process
     struct list_head lock_list;
     struct task_struct *task_struct;
 } rotation_lock_list;
