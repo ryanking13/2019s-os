@@ -101,4 +101,5 @@ modules.img
 test/*
 !/test/*.c
 
+tizen-image
 *.img
