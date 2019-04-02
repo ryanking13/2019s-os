@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     }
 
     char pname[100];
-    sprintf(pname, "%s-%d", argv[0], id);
+    sprintf(pname, "trial-%d", id);
 
     FILE *fp;
     int ret;
