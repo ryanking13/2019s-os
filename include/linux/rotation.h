@@ -2,7 +2,6 @@
 #ifndef _LINUX_ROTATION_H
 #define _LINUX_ROTATION_H
 
-#include <linux/semaphore.h>
 #include <linux/list.h>
 #include <linux/export.h>
 #include <linux/wait.h>
@@ -10,6 +9,8 @@
 #include <linux/mutex.h>
 
 /* ===== rotation_state struct related ===== */
+
+void release_locks_on_die(void); // process must call this function before die
 
 #define INIT_ROTATION_LOCK_LIST(_name, _degree, _range, _flag) {\
     .degree = _degree,\

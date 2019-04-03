@@ -91,6 +91,20 @@ void release_locks_on_die(void) {
         }
     }
 
+    list_for_each_entry_safe(lock_entry, _lock_entry, &rot->write_lock_wait_list.lock_list, lock_list) {
+        if (lock_entry->task_struct->tgid == cur->tgid) {
+            list_del(&lock_entry->lock_list);
+            kfree(lock_entry);
+        }
+    }
+
+    list_for_each_entry_safe(lock_entry, _lock_entry, &rot->read_lock_wait_list.lock_list, lock_list) {
+        if (lock_entry->task_struct->tgid == cur->tgid) {
+            list_del(&lock_entry->lock_list);
+            kfree(lock_entry);
+        }
+    }
+
     wake_up_wait_list(rot);
     rotation_unlock(rot);
     return;
