@@ -43,7 +43,9 @@ def parse_args():
                         help='do not move test binaries to USB, just build and exit')
     parser.add_argument('--device', default=None,
                         help='force device path (e.g. /dev/sdb), use this argument if device is not automatically detected')
-    
+    parser.add_argument('--qemu', action='store_true',
+                        help='move test binaries to file system for qemu')
+
     args = parser.parse_args()
     return args
 
@@ -62,6 +64,25 @@ def build():
     source_files = p.glob('*.c')
     for f in source_files:
         _exec(test_build_cmd.format(source=f.name.split('.')[0]), shell=True)
+
+    if args.qemu:
+        info('Copying test binaries to qemu file system')
+        tmp_dir = '/tmp/{}'.format(str(uuid.uuid4()))
+        p = Path(tmp_dir)
+        p.mkdir()
+        _exec('mount {device} {path}'.format(device='tizen-image/rootfs.img', path=tmp_dir), shell=True)
+
+        try:
+            # make file system writable
+            _exec('sed -i \'s/defaults,noatime,ro/defaults,noatime/\' {path}/etc/fstab'.format(path=tmp_dir), shell=True)
+            _exec('cp test/* {path}/root/'.format(path=tmp_dir), shell=True)
+        except sp.CalledProcessError as e:
+            error('copy failed with return code {}'.format(e.returncode))
+        finally:
+            _exec('umount {path}'.format(path=tmp_dir), shell=True)
+            p.rmdir()
+
+        info('Done copying')       
 
     if args.no_copy:
         return
