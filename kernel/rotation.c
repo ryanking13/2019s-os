@@ -5,8 +5,6 @@
 #include <linux/list.h>
 #include <linux/wait.h>
 
-// TODO: handle process die auto unlocking
-
 rotation_state init_rotation = INIT_ROTATION_STATE(init_rotation);
 EXPORT_SYMBOL(init_rotation);
 
@@ -70,8 +68,8 @@ int wake_up_wait_list(rotation_state *rot) {
 }
 
 /* release locks on die */
+// this function currently not work
 void exit_rot_lock(struct task_struct * cur) {
-    // TODO: this function is not tested
     rotation_state *rot = &init_rotation;
     rotation_lock_list* lock_entry;
     rotation_lock_list* _lock_entry; // temporary storage for list_for_each_entry_safe

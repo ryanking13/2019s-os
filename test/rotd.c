@@ -8,24 +8,10 @@
 #include <unistd.h>
 #include <stdio.h>
 
-int notFinished = 1;
-
-void term(int signum)
-{
-	notFinished = 0;
-}
-
 void sensor()
 {
-	/* setup for handling SIGTERM signal */
-	struct sigaction action;
-	memset(&action, 0, sizeof(struct sigaction));
-	action.sa_handler = term;
-	if (sigaction(SIGTERM, &action, NULL) == -1)
-		exit(-1);
-	
 	int degree = 0;
-	while (notFinished) {
+	while (1) {
 		degree = (degree + 30) % 360;
 		// syscall(SYSCALL_SET_ROTATION, degree);
 		int ret = syscall(SYSCALL_SET_ROTATION, degree);

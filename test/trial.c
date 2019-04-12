@@ -4,13 +4,6 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-/* TODO: remove this after handled auto unlock */
-#include <signal.h>
-int done = 0;
-void sig_handler(int signo)
-{
-  done = 1;
-}
 /* ========================================== */
 
 #define SET_ROTATION(degree) syscall(398, degree)
@@ -38,10 +31,6 @@ void factorize(int num) {
 
 int main(int argc, char *argv[]) {
 
-    /* TODO: remove after handled auto unlock */
-    signal(SIGINT, (void *)sig_handler);
-    signal(SIGTERM, (void *)sig_handler);
-
     if (argc == 1) {
         printf("[-] Usage: %s <starting number>\n", argv[0]);
         return 1;
@@ -57,7 +46,7 @@ int main(int argc, char *argv[]) {
 
     FILE *fp;
     int ret;
-    for(; !done /* TODO: remove after handled auto unlock */;) {
+    for(;;) {
         ret = ROTLOCK_READ(90, 90);
         // printf("[*] rotlock_read ended: %d\n", ret);
         fp = fopen("integer", "rt");
