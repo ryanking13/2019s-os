@@ -10,7 +10,7 @@
 
 /* ===== rotation_state struct related ===== */
 
-void release_locks_on_die(void); // process must call this function before die
+void exit_rot_lock(struct task_struct * cur); // process must call this function before die
 
 #define INIT_ROTATION_LOCK_LIST(_name, _degree, _range, _flag) {\
     .degree = _degree,\
@@ -48,47 +48,19 @@ typedef struct {
 } rotation_state;
 
 /* global rotation_state struct */
-rotation_state init_rotation = INIT_ROTATION_STATE(init_rotation);
-EXPORT_SYMBOL(init_rotation);
+extern rotation_state init_rotation;
 
-inline void rotation_lock(rotation_state* rot) {
-    // spin_lock(&rot->lock);
-    mutex_lock(&rot->lock);
-}
+inline void rotation_lock(rotation_state* rot);
 
-inline void rotation_unlock(rotation_state* rot) {
-    // spin_unlock(&rot->lock);
-    mutex_unlock(&rot->lock);
-}
+inline void rotation_unlock(rotation_state* rot);
 
-inline void rotation_set_degree(rotation_state* rot, int degree) {
-    rot->degree = degree;
-}
+inline void rotation_set_degree(rotation_state* rot, int degree);
 
-inline int is_device_in_lock_range(int degree, int range, rotation_state* rot) {
-    int diff_cw = abs(rot->degree - degree);
-    int diff_ccw = 360 - diff_cw;
+inline int is_device_in_lock_range(int degree, int range, rotation_state* rot);
 
-    if (diff_cw <= range || diff_ccw <= range)
-        return 1;
+inline int is_device_in_lock_range_of_lock_entry(rotation_lock_list* entry, rotation_state* rot);
 
-    return 0;
-}
-
-inline int is_device_in_lock_range_of_lock_entry(rotation_lock_list* entry, rotation_state* rot) {
-    return is_device_in_lock_range(entry->degree, entry->range, rot);
-}
-
-inline int is_lock_ranges_overlap(rotation_lock_list* p, rotation_lock_list* q) {
-    int diff_cw = abs(p->degree -  q->degree);
-    int diff_ccw = 360 - diff_cw;
-    int range = p->range + q->range;
-
-    if (diff_cw <= range || diff_ccw <= range)
-        return 1;
-
-    return 0;
-}
+inline int is_lock_ranges_overlap(rotation_lock_list* p, rotation_lock_list* q);
 
 /* ===== rotation_state struct related ===== */
 
