@@ -199,7 +199,7 @@ __wake up__
 
 ### 2.5. Handling process exit
 
-__TODO (MK_RD)__
+`kernel/exit.c`의 `do_exit()` 함수에 프로세스가 잡고 있는 락을 해제하는 함수를 호출하는 로직을 추가함.
 
 ```
 1. lock을 잡은(잡고자 하는) reader/writer 리스트를 순회하며, 자신이 등록한 모든 노드를 리스트에서 제거
