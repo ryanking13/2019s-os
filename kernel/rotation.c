@@ -5,7 +5,8 @@
 #include <linux/list.h>
 #include <linux/wait.h>
 
-// TODO: handle process die auto unlocking
+rotation_state init_rotation = INIT_ROTATION_STATE(init_rotation);
+EXPORT_SYMBOL(init_rotation);
 
 /* iterate through waiting lock list and wake up if in valid range */
 int wake_up_wait_list(rotation_state *rot) {
@@ -67,14 +68,12 @@ int wake_up_wait_list(rotation_state *rot) {
 }
 
 /* release locks on die */
-void release_locks_on_die(void) {
-    // TODO: this function is not tested
+// this function currently not work
+void exit_rot_lock(struct task_struct * cur) {
     rotation_state *rot = &init_rotation;
     rotation_lock_list* lock_entry;
     rotation_lock_list* _lock_entry; // temporary storage for list_for_each_entry_safe
-    struct task_struct *cur;
 
-    cur = current;
     rotation_lock(rot);
 
     list_for_each_entry_safe(lock_entry, _lock_entry, &rot->write_lock_list.lock_list, lock_list) {
@@ -370,6 +369,45 @@ long rotunlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <=
 
     // remove this thread from reader list
     // then, same as what set_rotation do
+}
+
+inline void rotation_lock(rotation_state* rot) {
+    // spin_lock(&rot->lock);
+    mutex_lock(&rot->lock);
+}
+
+inline void rotation_unlock(rotation_state* rot) {
+    // spin_unlock(&rot->lock);
+    mutex_unlock(&rot->lock);
+}
+
+inline void rotation_set_degree(rotation_state* rot, int degree) {
+    rot->degree = degree;
+}
+
+inline int is_device_in_lock_range(int degree, int range, rotation_state* rot) {
+    int diff_cw = abs(rot->degree - degree);
+    int diff_ccw = 360 - diff_cw;
+
+    if (diff_cw <= range || diff_ccw <= range)
+        return 1;
+
+    return 0;
+}
+
+inline int is_device_in_lock_range_of_lock_entry(rotation_lock_list* entry, rotation_state* rot) {
+    return is_device_in_lock_range(entry->degree, entry->range, rot);
+}
+
+inline int is_lock_ranges_overlap(rotation_lock_list* p, rotation_lock_list* q) {
+    int diff_cw = abs(p->degree -  q->degree);
+    int diff_ccw = 360 - diff_cw;
+    int range = p->range + q->range;
+
+    if (diff_cw <= range || diff_ccw <= range)
+        return 1;
+
+    return 0;
 }
 
 SYSCALL_DEFINE1(set_rotation, int, degree)
