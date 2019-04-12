@@ -101,6 +101,6 @@ modules.img
 test/*
 !/test/*.c
 !/test/*.tar.gz
-
+!/test/*.sh
 tizen-image
 *.img
