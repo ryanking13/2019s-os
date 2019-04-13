@@ -82,7 +82,7 @@ sudo ./build_test.py --eject    # eject sdcard after upload
 
 - [include/linux/rotation.h](./include/linux/rotation.h)
   - rotation lock과 관련한 구조체 정의
-  - 기본적인 헬퍼 함수 정의/구현
+  - 기본적인 헬퍼 함수 정의
 
 - [kernel/rotation.c](./kernel/rotation.c)
   - rotation lock/unlock syscall 구현
@@ -215,15 +215,15 @@ __wake up__
 
 ### 4. Test code
 
-__TODO__
+- `rotd.c`, `selector.c`, `trial.c`
+  - 프로젝트 스펙과 동일함
 
-- selector.c
-- trial.c
-- test_code_which_checks_various_cases.c
-
+- __TODO__ : test_code_which_checks_various_cases.c
+  - __TODO__
+  
 ## 5. Lessons learned
 
-__TODO__
+- 멀티 코어 / 스레드 환경에서 효율적으로 synchronization / mutual exclusion 을 달성하는 것이 매우 까다로운 문제라는 것을 느낌
 
 ## 6. References
 
