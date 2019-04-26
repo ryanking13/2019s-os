@@ -6756,3 +6756,33 @@ const u32 sched_prio_to_wmult[40] = {
  /*  10 */  39045157,  49367440,  61356676,  76695844,  95443717,
  /*  15 */ 119304647, 148102320, 186737708, 238609294, 286331153,
 };
+
+/* OS project 3 */
+
+/*
+ * Set the SCHED_WRR weight of process, as identified by 'pid'.
+ * If 'pid' is 0, set the weight for the calling process.
+ * System call number 398.
+ */
+int sched_setweight(pid_t pid, int weight) {
+	return 398;
+}
+
+/*
+ * Obtain the SCHED_WRR weight of a process as identified by 'pid'.
+ * If 'pid' is 0, return the weight of the calling process.
+ * System call number 399.
+ */
+int sched_getweight(pid_t pid) {
+	return 399;
+}
+
+SYSCALL_DEFINE2(sched_setweight, pid_t, pid, int, weight)
+{
+    return (long)sched_setweight(pid, weight);
+}
+
+SYSCALL_DEFINE1(sched_getweight, pid_t, pid)
+{
+    return (long)sched_getweight(pid);
+}
