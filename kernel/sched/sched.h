@@ -140,10 +140,16 @@ static inline int dl_policy(int policy)
 {
 	return policy == SCHED_DEADLINE;
 }
+
+/* OS Project 3 */
+static inline int wrr_policy(int policy)
+{
+	return policy == SCHED_WRR;
+}
 static inline bool valid_policy(int policy)
 {
 	return idle_policy(policy) || fair_policy(policy) ||
-		rt_policy(policy) || dl_policy(policy);
+		rt_policy(policy) || dl_policy(policy) || wrr_policy(policy) /* OS Project 3 */;
 }
 
 static inline int task_has_rt_policy(struct task_struct *p)
@@ -171,6 +177,11 @@ dl_entity_preempt(struct sched_dl_entity *a, struct sched_dl_entity *b)
 struct rt_prio_array {
 	DECLARE_BITMAP(bitmap, MAX_RT_PRIO+1); /* include 1 bit for delimiter */
 	struct list_head queue[MAX_RT_PRIO];
+};
+
+/* OS Project 3 */
+struct wrr_array {
+	struct list_head queue;
 };
 
 struct rt_bandwidth {
@@ -541,6 +552,18 @@ struct rt_rq {
 #endif
 };
 
+/* OS Project 3 */
+struct wrr_rq {
+	struct wrr_array active;
+	unsigned int wrr_nr_running;
+	unsigned int weight_sum;
+	// struct plist_head pushable_tasks;
+	int wrr_queued;
+
+	/* Nests inside the rq lock: */
+	raw_spinlock_t wrr_runtime_lock;
+};
+
 /* Deadline class' related fields in a runqueue */
 struct dl_rq {
 	/* runqueue is an rbtree, ordered by deadline */
@@ -708,6 +731,8 @@ struct rq {
 	struct cfs_rq cfs;
 	struct rt_rq rt;
 	struct dl_rq dl;
+	/* OS Project 3 */
+	struct wrr_rq wrr;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* list of leaf cfs_rq on this cpu: */
@@ -1984,6 +2009,8 @@ print_numa_stats(struct seq_file *m, int node, unsigned long tsf,
 extern void init_cfs_rq(struct cfs_rq *cfs_rq);
 extern void init_rt_rq(struct rt_rq *rt_rq);
 extern void init_dl_rq(struct dl_rq *dl_rq);
+/* OS Project 3 */
+extern void init_wrr_rq(struct wrr_rq *wrr_rq);
 
 extern void cfs_bandwidth_usage_inc(void);
 extern void cfs_bandwidth_usage_dec(void);
