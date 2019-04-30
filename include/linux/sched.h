@@ -473,10 +473,11 @@ struct sched_wrr_entity {
 	struct list_head		run_list;
 	unsigned int			weight;
 	unsigned int			time_slice;
-	// unsigned short			on_rq;
+	unsigned short			on_rq;
 	// unsigned short			on_list;
 
 	struct sched_wrr_entity		*back;
+	struct wrr_rq			*wrr_rq;
 };
 
 struct sched_dl_entity {

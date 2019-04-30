@@ -559,7 +559,8 @@ struct wrr_rq {
 	unsigned int weight_sum;
 	// struct plist_head pushable_tasks;
 	int wrr_queued;
-
+	struct rq *rq;
+	
 	/* Nests inside the rq lock: */
 	raw_spinlock_t wrr_runtime_lock;
 };
@@ -1521,6 +1522,8 @@ extern const struct sched_class dl_sched_class;
 extern const struct sched_class rt_sched_class;
 extern const struct sched_class fair_sched_class;
 extern const struct sched_class idle_sched_class;
+/* OS Project 3 */
+extern const struct sched_class wrr_sched_class;
 
 
 #ifdef CONFIG_SMP
