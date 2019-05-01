@@ -6771,7 +6771,48 @@ const u32 sched_prio_to_wmult[40] = {
  * System call number 398.
  */
 int sched_setweight(pid_t pid, int weight) {
-	return 398;
+	struct rq_flags rf;
+	struct task_struct *p;
+	struct rq *rq;
+
+	int curr_euid = current_euid().val;
+
+	// invalid weight
+	if (weight < 1 || weight > 20)
+		return -EINVAL;
+
+	// invalid pid (< 0)
+	if (pid < 0)
+		return -EINVAL;
+
+	p = find_process_by_pid(pid);
+
+	task_rq_lock(p, &rf);
+	rq = task_rq(p);
+
+	// invalid pid (not WRR scheduler)
+	if (p->policy != SCHED_WRR) {
+		task_rq_unlock(rq, p, &rf);
+		return -EINVAL;
+	}
+	
+	// if you are not root and trying to raise weight
+	if (p->wrr.weight < weight && curr_euid != 0) {
+		task_rq_unlock(rq, p, &rf);
+		return -EPERM;
+	}
+
+	// if you are not root & not process owner and trying to lower weight
+	if (p->wrr.weight >= weight && (curr_euid != 0 && !check_same_owner(p))) {
+		task_rq_unlock(rq, p, &rf);
+		return -EPERM;
+	}
+
+	p->wrr.weight = weight;
+	
+	// success
+	task_rq_unlock(rq, p, &rf);
+	return 0;
 }
 
 /*
@@ -6780,7 +6821,19 @@ int sched_setweight(pid_t pid, int weight) {
  * System call number 399.
  */
 int sched_getweight(pid_t pid) {
-	return 399;
+	struct task_struct *p;
+	
+	// invalid pid (< 0)
+	if (pid < 0)
+		return -EINVAL;
+
+	p = find_process_by_pid(pid);
+
+	// invalid pid (not WRR scheduler)
+	if (p->policy != SCHED_WRR) 
+		return -EINVAL;
+
+	return p->wrr.weight;
 }
 
 SYSCALL_DEFINE2(sched_setweight, pid_t, pid, int, weight)
