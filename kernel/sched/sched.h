@@ -1524,6 +1524,7 @@ extern const struct sched_class fair_sched_class;
 extern const struct sched_class idle_sched_class;
 /* OS Project 3 */
 extern const struct sched_class wrr_sched_class;
+extern unsigned int calc_wrr_timeslice(unsigned int weight);
 
 
 #ifdef CONFIG_SMP
