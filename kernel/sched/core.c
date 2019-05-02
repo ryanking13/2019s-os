@@ -3052,6 +3052,8 @@ void scheduler_tick(void)
 #ifdef CONFIG_SMP
 	rq->idle_balance = idle_cpu(cpu);
 	trigger_load_balance(rq);
+	/* OS Project 3 */
+	trigger_load_balance_wrr(rq);
 #endif
 	rq_last_tick_reset(rq);
 }
@@ -6793,6 +6795,7 @@ long sched_setweight(pid_t pid, int weight) {
 	struct rq_flags rf;
 	struct task_struct *p;
 	struct rq *rq;
+	int prev_weight;
 
 	int curr_euid = current_euid().val;
 
@@ -6827,7 +6830,7 @@ long sched_setweight(pid_t pid, int weight) {
 		return -EPERM;
 	}
 
-	int prev_weight = p->wrr.weight;
+	prev_weight = p->wrr.weight;
 	if (p->wrr.on_rq) {
 		rq->wrr.weight_sum += (weight - prev_weight);
 	}

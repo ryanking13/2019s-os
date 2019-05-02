@@ -16,8 +16,30 @@ void init_wrr_rq(struct wrr_rq *wrr_rq) {
 	
 	wrr_rq->wrr_nr_running = 0;
 	wrr_rq->weight_sum = 0;
+	wrr_rq->load_balance_time = WRR_LOAD_BALANCE_PERIOD;
 	// wrr_rq->wrr_queued = 0;
 	raw_spin_lock_init(&wrr_rq->wrr_runtime_lock);
+}
+
+/*
+ * Trigger the SCHED_SOFTIRQ if it is time to do periodic load balancing.
+ */
+void trigger_load_balance_wrr(struct rq *rq)
+{
+	struct wrr_rq *wrr_rq = &rq->wrr;
+	int cpu = smp_processor_id();
+
+	if(--wrr_rq->load_balance_time) {
+		return;
+	}
+
+	wrr_rq->load_balance_time = WRR_LOAD_BALANCE_PERIOD;
+
+	// only one cpu must do load balancing
+	if (cpu == cpumask_first(cpu_online_mask)) {
+		// printk(KERN_INFO "do load balance on cpu %d\n", cpu);
+		// TODO: implement
+	}
 }
 
 void update_weight_wrr(struct wrr_rq *wrr_rq, struct sched_wrr_entity *wrr_se, int weight) {
@@ -326,23 +348,6 @@ static void task_tick_wrr(struct rq *rq, struct task_struct *p, int queued)
 		return;
 	}
 }
-
-// /*
-//  * Trigger the SCHED_SOFTIRQ if it is time to do periodic load balancing.
-//  */
-// void trigger_load_balance(struct rq *rq)
-// {
-// 	/* Don't need to rebalance while attached to NULL domain */
-// 	if (unlikely(on_null_domain(rq)))
-// 		return;
-
-// 	if (time_after_eq(jiffies, rq->next_balance))
-// 		raise_softirq(SCHED_SOFTIRQ);
-// #ifdef CONFIG_NO_HZ_COMMON
-// 	if (nohz_kick_needed(rq))
-// 		nohz_balancer_kick();
-// #endif
-// }
 
 const struct sched_class wrr_sched_class = {
     // rt -> wrr -> cfs

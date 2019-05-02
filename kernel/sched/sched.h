@@ -560,6 +560,7 @@ struct wrr_rq {
 	// struct plist_head pushable_tasks;
 	int wrr_queued;
 	struct rq *rq;
+	unsigned int load_balance_time;
 	
 	/* Nests inside the rq lock: */
 	raw_spinlock_t wrr_runtime_lock;
@@ -1533,8 +1534,11 @@ extern const struct sched_class idle_sched_class;
 #define WRR_TIMESLICE		(10 * HZ / 1000)
 // CPU ID that must be empty (arbitrarily selecte)
 #define WRR_CPU_EMPTY 		0x0
+// load balancing period is 2000ms
+#define WRR_LOAD_BALANCE_PERIOD		(2000 * HZ / 1000)
 extern const struct sched_class wrr_sched_class;
 extern unsigned int calc_wrr_timeslice(unsigned int weight);
+extern void trigger_load_balance_wrr(struct rq *rq);
 
 
 #ifdef CONFIG_SMP
