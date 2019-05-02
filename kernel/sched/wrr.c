@@ -2,13 +2,6 @@
 
 #include "sched.h"
 
-// default timeslice is 10ms
-// #define WRR_TIMESLICE		(10 * HZ / 1000)
-#define WRR_TIMESLICE		(1000 * HZ / 1000)
-// CPU ID that must be empty (arbitrarily selecte)
-#define WRR_CPU_EMPTY 		0x0
-
-
 unsigned int calc_wrr_timeslice(unsigned int weight) {
 	return weight * WRR_TIMESLICE;
 }
@@ -16,20 +9,15 @@ unsigned int calc_wrr_timeslice(unsigned int weight) {
 /* OS Project 3 */
 void init_wrr_rq(struct wrr_rq *wrr_rq) {
 	struct wrr_array *array;
+	printk(KERN_INFO "Init WRR run queue\n");
+
 	array = &wrr_rq->active;
 	INIT_LIST_HEAD(&array->queue);
 	
 	wrr_rq->wrr_nr_running = 0;
 	wrr_rq->weight_sum = 0;
-	wrr_rq->wrr_queued = 0;
+	// wrr_rq->wrr_queued = 0;
 	raw_spin_lock_init(&wrr_rq->wrr_runtime_lock);
-}
-
-static inline struct rq *rq_of_wrr_se(struct sched_wrr_entity *wrr_se)
-{
-	struct wrr_rq *wrr_rq = wrr_se->wrr_rq;
-
-	return wrr_rq->rq;
 }
 
 static inline struct rq *rq_of_wrr_rq(struct wrr_rq *wrr_rq)
@@ -37,17 +25,10 @@ static inline struct rq *rq_of_wrr_rq(struct wrr_rq *wrr_rq)
 	return wrr_rq->rq;
 }
 
-static inline struct wrr_rq *wrr_rq_of_se(struct sched_wrr_entity *wrr_se)
-{
-	return wrr_se->wrr_rq;
-}
-
 static inline int on_wrr_rq(struct sched_wrr_entity *wrr_se)
 {
 	return wrr_se->on_rq;
 }
-
-#define wrr_entity_is_task(wrr_se) (!(wrr_se)->my_q)
 
 static inline struct task_struct *wrr_task_of(struct sched_wrr_entity *wrr_se)
 {
@@ -84,9 +65,9 @@ static void update_curr_wrr(struct rq *rq)
 	cpuacct_charge(curr, delta_exec);
 }
 
-static void __enqueue_wrr_entity(struct sched_wrr_entity *wrr_se, unsigned int flags)
+static void __enqueue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, unsigned int flags)
 {
-	struct wrr_rq *wrr_rq = wrr_rq_of_se(wrr_se);
+	struct wrr_rq *wrr_rq = &rq->wrr;
 	struct wrr_array *array = &wrr_rq->active;
 	struct list_head *queue = &array->queue;
 
@@ -96,22 +77,24 @@ static void __enqueue_wrr_entity(struct sched_wrr_entity *wrr_se, unsigned int f
 	wrr_rq->wrr_nr_running += 1;
 }
 
-static void enqueue_wrr_entity(struct sched_wrr_entity *wrr_se, unsigned int flags)
+static void enqueue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, unsigned int flags)
 {
-	// struct rq *rq = rq_of_wrr_se(wrr_se);
-	__enqueue_wrr_entity(wrr_se, flags);
+	__enqueue_wrr_entity(rq, wrr_se, flags);
 }
 
 
 static void enqueue_task_wrr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_wrr_entity *wrr_se = &p->wrr;
-	enqueue_wrr_entity(wrr_se, flags);
+
+	printk(KERN_INFO "Enqueue WRR run queue %d\n", p->pid);
+
+	enqueue_wrr_entity(rq, wrr_se, flags);
 }
 
-static void __dequeue_wrr_entity(struct sched_wrr_entity *wrr_se, unsigned int flags)
+static void __dequeue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, unsigned int flags)
 {
-	struct wrr_rq *wrr_rq = wrr_rq_of_se(wrr_se);
+	struct wrr_rq *wrr_rq = &rq->wrr;
 	// struct wrr_array *array = &wrr_rq->active;
 
 	// __delist_wrr_entity(wrr_se, array);
@@ -123,21 +106,21 @@ static void __dequeue_wrr_entity(struct sched_wrr_entity *wrr_se, unsigned int f
 	wrr_rq->wrr_nr_running -= 1;
 }
 
-static void dequeue_wrr_entity(struct sched_wrr_entity *wrr_se, unsigned int flags)
+static void dequeue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, unsigned int flags)
 {
-	// struct rq *rq = rq_of_wrr_se(wrr_se);
 
 	// dequeue_rt_stack(rt_se, flags);
 	if(on_wrr_rq(wrr_se))
-		__dequeue_wrr_entity(wrr_se, flags);
+		__dequeue_wrr_entity(rq, wrr_se, flags);
 }
 
 static void dequeue_task_wrr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_wrr_entity *wrr_se = &p->wrr;
+	printk(KERN_INFO "Dequeue WRR %d\n", p->pid);
 
 	update_curr_wrr(rq);
-	dequeue_wrr_entity(wrr_se, flags);
+	dequeue_wrr_entity(rq, wrr_se, flags);
 }
 
 /*
@@ -146,6 +129,7 @@ static void dequeue_task_wrr(struct rq *rq, struct task_struct *p, int flags)
  */
 static void requeue_wrr_entity(struct wrr_rq *wrr_rq, struct sched_wrr_entity *wrr_se)
 {
+
 	if (on_wrr_rq(wrr_se)) {
 		struct wrr_array *array = &wrr_rq->active;
 		struct list_head *queue = &array->queue;
@@ -157,25 +141,30 @@ static void requeue_task_wrr(struct rq *rq, struct task_struct *p)
 {
 	struct sched_wrr_entity *wrr_se = &p->wrr;
 	struct wrr_rq *wrr_rq;
+	
+	// printk(KERN_INFO "Requeue WRR %d\n", p->pid);
 
-	wrr_rq = wrr_rq_of_se(wrr_se);
+	wrr_rq = &rq->wrr;
 	requeue_wrr_entity(wrr_rq, wrr_se);
 }
 
 static void yield_task_wrr(struct rq *rq)
 {
+	printk(KERN_INFO "Yield WRR\n");
 	requeue_task_wrr(rq, rq->curr);
 }
 
 static void check_preempt_curr_wrr(struct rq *rq, struct task_struct *p, int flags)
 {
 	// no preemption for WRR;
+	printk(KERN_INFO "Check preempt WRR %d\n", p->pid);
 	return;
 }
 
 static void prio_changed_wrr(struct rq *rq, struct task_struct *p, int oldprio)
 {
 	// priority have no effect for WRR;
+	printk(KERN_INFO "Prio changed WRR %d\n", p->pid);
 	return;
 }
 
@@ -187,6 +176,11 @@ static struct sched_wrr_entity *pick_next_wrr_entity(struct rq *rq,
 	struct list_head *queue;
 
 	queue = &array->queue;
+
+	if (list_empty_careful(queue->next)) {
+		return NULL;
+	}
+
 	next = list_entry(queue->next, struct sched_wrr_entity, run_list);
 
 	return next;
@@ -199,7 +193,12 @@ static struct task_struct *_pick_next_task_wrr(struct rq *rq)
 	struct wrr_rq *wrr_rq  = &rq->wrr;
 
 	wrr_se = pick_next_wrr_entity(rq, wrr_rq);
-	BUG_ON(!wrr_se);
+
+	if (wrr_se == NULL) {
+		return NULL;
+	}
+
+	// BUG_ON(!wrr_se);
 
 	p = wrr_task_of(wrr_se);
 	p->se.exec_start = rq_clock_task(rq);
@@ -210,13 +209,15 @@ static struct task_struct *_pick_next_task_wrr(struct rq *rq)
 static struct task_struct * pick_next_task_wrr(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 {
 	struct task_struct *p;
-	struct wrr_rq *wrr_rq = &rq->wrr;
+	// struct wrr_rq *wrr_rq = &rq->wrr;
+
+	// printk(KERN_INFO "Pick next task WRR\n");
 
 	if (prev->sched_class == &wrr_sched_class)
 		update_curr_wrr(rq);
 
-	if (!wrr_rq->wrr_queued)
-		return NULL;
+	// if (!wrr_rq->wrr_queued)
+	// 	return NULL;
 
 	put_prev_task(rq, prev);
 
@@ -227,6 +228,7 @@ static struct task_struct * pick_next_task_wrr(struct rq *rq, struct task_struct
 
 static void put_prev_task_wrr(struct rq *rq, struct task_struct *p)
 {
+	// printk(KERN_INFO "Put prev task WRR %d\n", p->pid);
 	update_curr_wrr(rq);
 }
 
@@ -311,6 +313,8 @@ static int find_lowest_rq_wrr(struct task_struct *task)
 static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int flags)
 {
 	int target;
+	
+	printk(KERN_INFO "Select task rq WRR %d\n", p->pid);
 
 	/* For anything but wake ups, just return the task_cpu */
 	// if (sd_flag != SD_BALANCE_WAKE && sd_flag != SD_BALANCE_FORK)
@@ -326,7 +330,8 @@ static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int f
 	if (target != -1) {
 		cpu = target;
 	} else {
-		// error case, should not happen?
+		BUG_ON(target == -1);
+		// error case, raise error?
 	}
 	rcu_read_unlock();
 
@@ -338,6 +343,7 @@ out:
 // try reschedule without checking priority (not very efficient)
 static void switched_to_wrr(struct rq *rq, struct task_struct *p)
 {
+	printk(KERN_INFO "switched to WRR %d\n", p->pid);
 	if (task_on_rq_queued(p) && rq->curr != p) {
 		resched_curr(rq);
 	}
@@ -347,6 +353,7 @@ static void switched_to_wrr(struct rq *rq, struct task_struct *p)
 static void task_fork_wrr(struct task_struct *p)
 {
 	/* OS Project 3 */
+	printk(KERN_INFO "fork WRR %d\n", p->pid);
 	INIT_LIST_HEAD(&p->wrr.run_list);
 	p->wrr.time_slice	= calc_wrr_timeslice(p->wrr.weight);
 	p->wrr.on_rq = 0;
@@ -355,6 +362,7 @@ static void task_fork_wrr(struct task_struct *p)
 static void set_curr_task_wrr(struct rq *rq)
 {
 	struct task_struct *p = rq->curr;
+	printk(KERN_INFO "Set curr task WRR\n");
 
 	p->se.exec_start = rq_clock_task(rq);
 }
@@ -363,16 +371,24 @@ static void task_tick_wrr(struct rq *rq, struct task_struct *p, int queued)
 {
 	// TODO: load balancing here??
 
-	struct sched_wrr_entity *wrr_se = &p->wrr;
+	// struct sched_wrr_entity *wrr_se = &p->wrr;
+	struct wrr_rq *wrr_rq = &rq->wrr;
+	struct wrr_array *array = &wrr_rq->active;
+	struct list_head *queue = &array->queue;
 
 	update_curr_wrr(rq);
+
+	// printk(KERN_INFO "TIMESLICE %d %d\n", p->pid, p->wrr.time_slice);
 
 	if (--p->wrr.time_slice)
 		return;
 
 	p->wrr.time_slice = calc_wrr_timeslice(p->wrr.weight);
 
-	if (wrr_se->run_list.prev != wrr_se->run_list.next) {
+	// printk(KERN_INFO "tick rotation: %d %d\n", p->pid, p->wrr.time_slice);
+
+	if (queue->prev != queue->next) {
+		// printk(KERN_INFO "try reschedule WRR\n");
 		requeue_task_wrr(rq, p);
 		resched_curr(rq);
 		return;

@@ -1216,6 +1216,10 @@ static inline void set_task_rq(struct task_struct *p, unsigned int cpu)
 	p->rt.rt_rq  = tg->rt_rq[cpu];
 	p->rt.parent = tg->rt_se[cpu];
 #endif
+
+	/* OS Project 3 */
+	struct rq *rq = cpu_rq(cpu);
+	p->wrr.wrr_rq = &rq->wrr;
 }
 
 #else /* CONFIG_CGROUP_SCHED */
@@ -1523,6 +1527,12 @@ extern const struct sched_class rt_sched_class;
 extern const struct sched_class fair_sched_class;
 extern const struct sched_class idle_sched_class;
 /* OS Project 3 */
+// default weight is 10
+#define WRR_DEFAULT_WEIGHT 10
+// default timeslice is 10ms
+#define WRR_TIMESLICE		(10 * HZ / 1000)
+// CPU ID that must be empty (arbitrarily selecte)
+#define WRR_CPU_EMPTY 		0x0
 extern const struct sched_class wrr_sched_class;
 extern unsigned int calc_wrr_timeslice(unsigned int weight);
 

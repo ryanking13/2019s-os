@@ -2203,6 +2203,12 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->rt.on_rq		= 0;
 	p->rt.on_list		= 0;
 
+	/* OS Project 3 */
+	INIT_LIST_HEAD(&p->wrr.run_list);
+	p->wrr.weight = current->wrr.weight;
+	p->wrr.time_slice = calc_wrr_timeslice(p->wrr.weight);
+	p->wrr.on_rq = 0;
+
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	INIT_HLIST_HEAD(&p->preempt_notifiers);
 #endif
@@ -2389,7 +2395,13 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 		return -EAGAIN;
 	} else if (rt_prio(p->prio)) {
 		p->sched_class = &rt_sched_class;
-	} else {
+	} 
+	/* OS Project 3 */
+	else if (p->policy == SCHED_WRR) {
+		p->sched_class = &wrr_sched_class;
+		p->wrr.weight = current->wrr.weight;
+	}
+	else {
 		p->sched_class = &fair_sched_class;
 	}
 
@@ -3985,6 +3997,12 @@ static void __setscheduler(struct rq *rq, struct task_struct *p,
 		p->sched_class = &dl_sched_class;
 	else if (rt_prio(p->prio))
 		p->sched_class = &rt_sched_class;
+	/* OS Project 3 */
+	else if (p->policy == SCHED_WRR) {
+		p->sched_class = &wrr_sched_class;
+		p->wrr.weight = WRR_DEFAULT_WEIGHT;
+		p->wrr.time_slice = calc_wrr_timeslice(p->wrr.weight);
+	}
 	else
 		p->sched_class = &fair_sched_class;
 }
@@ -5871,6 +5889,7 @@ void __init sched_init(void)
 		init_dl_rq(&rq->dl);
 		/* OS Project 3 */
 		init_wrr_rq(&rq->wrr);
+
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.shares = ROOT_TASK_GROUP_LOAD;
 		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
@@ -6770,7 +6789,7 @@ const u32 sched_prio_to_wmult[40] = {
  * If 'pid' is 0, set the weight for the calling process.
  * System call number 398.
  */
-int sched_setweight(pid_t pid, int weight) {
+long sched_setweight(pid_t pid, int weight) {
 	struct rq_flags rf;
 	struct task_struct *p;
 	struct rq *rq;
@@ -6820,7 +6839,7 @@ int sched_setweight(pid_t pid, int weight) {
  * If 'pid' is 0, return the weight of the calling process.
  * System call number 399.
  */
-int sched_getweight(pid_t pid) {
+long sched_getweight(pid_t pid) {
 	struct task_struct *p;
 	
 	// invalid pid (< 0)
@@ -6838,10 +6857,10 @@ int sched_getweight(pid_t pid) {
 
 SYSCALL_DEFINE2(sched_setweight, pid_t, pid, int, weight)
 {
-    return (long)sched_setweight(pid, weight);
+    return sched_setweight(pid, weight);
 }
 
 SYSCALL_DEFINE1(sched_getweight, pid_t, pid)
 {
-    return (long)sched_getweight(pid);
+    return sched_getweight(pid);
 }
