@@ -23,11 +23,38 @@ int main(int argc, char **argv) {
     int ret = -1;
 
     pid_t pid = getpid();
+
+    cpu_set_t mask;
+    int binded_cpu;
+
+    CPU_ZERO(&mask);
+    // if commandline argument is not given, bind this process to CPU 1;
+    if (argc > 1) {
+        for(int i = 1; i < argc; i++) {
+            binded_cpu = atoi(argv[i]);
+            CPU_SET(binded_cpu, &mask);
+        }
+    }
+    else {
+        CPU_SET(1, &mask);
+    }
+
+    // bind this process to specific cpu
+    ret = sched_setaffinity(0, sizeof(mask), &mask);
+    printf("[sched_setaffinity] %d\n", ret);
+    if (ret < 0) {
+        return 0;
+    }
+
     const struct sched_param params = {0};
+
+    // check WRR scheduler is properly set
+    ret = sched_getscheduler(pid);
+    printf("[(before) getscheduler] %d\n", ret);
 
     // set this process to use WRR scheduler
     ret = sched_setscheduler(pid, SCHED_WRR, &params);
-    printf("[sched_setscheduler] %d\n", ret);
+    printf("[setscheduler] %d\n", ret);
 
     if (ret < 0) {
         return 0;
@@ -35,25 +62,8 @@ int main(int argc, char **argv) {
 
     // check WRR scheduler is properly set
     ret = sched_getscheduler(pid);
-    printf("[sched_getscheduler] %d\n", ret);
+    printf("[(after) getscheduler] %d\n", ret);
 
-    if (ret < 0) {
-        return 0;
-    }
-
-    cpu_set_t mask;
-    int binded_cpu;
-
-    // if commandline argument is not given, bind this process to CPU 1;
-    if (argc > 1) binded_cpu = atoi(argv[1]);
-    else binded_cpu = 1;
-
-    CPU_ZERO(&mask);
-    CPU_SET(binded_cpu, &mask);
-
-    // bind this process to specific cpu
-    ret = sched_setaffinity(0, sizeof(mask), &mask);
-    printf("[sched_setaffinity] %d\n", ret);
     if (ret < 0) {
         return 0;
     }
@@ -66,9 +76,20 @@ int main(int argc, char **argv) {
         return 0;
     }
 
+    pid_t newpid;
+    newpid = fork();
+
+    if (newpid == 0) {
+        pid = getpid();
+    }
+
     int cpu;
-    while(1) {
-        cpu = sched_getcpu();
-        printf("%d %f\n", cpu, get_time());
+    int weight;
+    for(int i = 0;; i++) {
+        if (i % 3000000 == 0) {
+            cpu = sched_getcpu();
+            weight = SCHED_GETWEIGHT(pid);
+            printf("pid: %d cpu: %d ms: %d w: %d\n", pid, cpu, (int)get_time(), weight);
+        }
     }
 } 
