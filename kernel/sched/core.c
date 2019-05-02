@@ -6827,6 +6827,10 @@ long sched_setweight(pid_t pid, int weight) {
 		return -EPERM;
 	}
 
+	int prev_weight = p->wrr.weight;
+	if (p->wrr.on_rq) {
+		rq->wrr.weight_sum += (weight - prev_weight);
+	}
 	p->wrr.weight = weight;
 	
 	// success

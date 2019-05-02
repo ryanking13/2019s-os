@@ -20,6 +20,12 @@ void init_wrr_rq(struct wrr_rq *wrr_rq) {
 	raw_spin_lock_init(&wrr_rq->wrr_runtime_lock);
 }
 
+void update_weight_wrr(struct wrr_rq *wrr_rq, struct sched_wrr_entity *wrr_se, int weight) {
+	int prev_weight = wrr_se->weight;
+	wrr_se->weight = weight;
+	wrr_rq->weight_sum += (weight - prev_weight);
+}
+
 static inline struct rq *rq_of_wrr_rq(struct wrr_rq *wrr_rq)
 {
 	return wrr_rq->rq;
@@ -75,6 +81,7 @@ static void __enqueue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se,
 	wrr_se->on_rq = 1;
 	// inc_rt_tasks(rt_se, rt_rq);
 	wrr_rq->wrr_nr_running += 1;
+	wrr_rq->weight_sum += wrr_se->weight;
 }
 
 static void enqueue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, unsigned int flags)
@@ -104,6 +111,7 @@ static void __dequeue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se,
 
 	// dec_rt_tasks(rt_se, rt_rq);
 	wrr_rq->wrr_nr_running -= 1;
+	wrr_rq->weight_sum -= wrr_se->weight;
 }
 
 static void dequeue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, unsigned int flags)
@@ -232,88 +240,12 @@ static void put_prev_task_wrr(struct rq *rq, struct task_struct *p)
 	update_curr_wrr(rq);
 }
 
-static DEFINE_PER_CPU(cpumask_var_t, local_cpu_mask);
-static int find_lowest_rq_wrr(struct task_struct *task)
-{
-	struct sched_domain *sd;
-	struct cpumask *lowest_mask = this_cpu_cpumask_var_ptr(local_cpu_mask);
-	int this_cpu = smp_processor_id();
-	int cpu      = task_cpu(task);
-
-	/* Make sure the mask is initialized first */
-	if (unlikely(!lowest_mask))
-		return -1;
-
-	if (task->nr_cpus_allowed == 1)
-		return -1; /* No other targets possible */
-
-	// Remove WRR_CPU_EMPTY from cpumask
-	cpumask_clear_cpu(WRR_CPU_EMPTY, lowest_mask);
-
-	if (!cpupri_find(&task_rq(task)->rd->cpupri, task, lowest_mask))
-		return -1; /* No targets found */
-
-	/*
-	 * At this point we have built a mask of cpus representing the
-	 * lowest priority tasks in the system.  Now we want to elect
-	 * the best one based on our affinity and topology.
-	 *
-	 * We prioritize the last cpu that the task executed on since
-	 * it is most likely cache-hot in that location.
-	 */
-	if (cpumask_test_cpu(cpu, lowest_mask))
-		return cpu;
-
-	/*
-	 * Otherwise, we consult the sched_domains span maps to figure
-	 * out which cpu is logically closest to our hot cache data.
-	 */
-	if (!cpumask_test_cpu(this_cpu, lowest_mask))
-		this_cpu = -1; /* Skip this_cpu opt if not among lowest */
-
-	rcu_read_lock();
-	for_each_domain(cpu, sd) {
-		if (sd->flags & SD_WAKE_AFFINE) {
-			int best_cpu;
-
-			/*
-			 * "this_cpu" is cheaper to preempt than a
-			 * remote processor.
-			 */
-			if (this_cpu != -1 &&
-			    cpumask_test_cpu(this_cpu, sched_domain_span(sd))) {
-				rcu_read_unlock();
-				return this_cpu;
-			}
-
-			best_cpu = cpumask_first_and(lowest_mask,
-						     sched_domain_span(sd));
-			if (best_cpu < nr_cpu_ids) {
-				rcu_read_unlock();
-				return best_cpu;
-			}
-		}
-	}
-	rcu_read_unlock();
-
-	/*
-	 * And finally, if there were no matches within the domains
-	 * just give the caller *something* to work with from the compatible
-	 * locations.
-	 */
-	if (this_cpu != -1)
-		return this_cpu;
-
-	cpu = cpumask_any(lowest_mask);
-	if (cpu < nr_cpu_ids)
-		return cpu;
-	return -1;
-}
-
 static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int flags)
 {
-	int target;
-	
+	int cpui;
+	int target_cpu = cpu;
+	int target_weight_sum = cpu_rq(cpu)->wrr.weight_sum;
+
 	printk(KERN_INFO "Select task rq WRR %d\n", p->pid);
 
 	/* For anything but wake ups, just return the task_cpu */
@@ -321,22 +253,22 @@ static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int f
 	// 	goto out;
 
 	/* OS Project 3 : one cpu (WRR_CPU_EMPTY) must be empty */
-	
-	if (!cpu == WRR_CPU_EMPTY)
-		goto out;
-	
-	target = find_lowest_rq_wrr(p);
+	rcu_read_lock();
 
-	if (target != -1) {
-		cpu = target;
-	} else {
-		BUG_ON(target == -1);
-		// error case, raise error?
+	// https://stackoverflow.com/questions/24437724/diff-between-various-cpu-masks-linux-kernel
+	for_each_present_cpu(cpui) {
+		struct rq *rq = cpu_rq(cpui);
+		struct wrr_rq *wrr_rq = &rq->wrr;
+		if (cpumask_test_cpu(cpui, &p->cpus_allowed)) {
+			if(wrr_rq->weight_sum < target_weight_sum) {
+				target_weight_sum = wrr_rq->weight_sum;
+				target_cpu = cpui;
+			}
+		}
 	}
 	rcu_read_unlock();
 
-out:
-	return cpu;
+	return target_cpu;
 }
 
 // if newly added process is not running
