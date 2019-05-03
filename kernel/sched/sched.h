@@ -564,6 +564,7 @@ struct wrr_rq {
 	
 	/* Nests inside the rq lock: */
 	raw_spinlock_t wrr_runtime_lock;
+	struct list_head pending_tasks;
 };
 
 /* Deadline class' related fields in a runqueue */

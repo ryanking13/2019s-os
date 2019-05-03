@@ -2205,6 +2205,7 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 
 	/* OS Project 3 */
 	INIT_LIST_HEAD(&p->wrr.run_list);
+	// INIT_LIST_HEAD(&p->pending_tasks);
 	p->wrr.weight = current->wrr.weight;
 	p->wrr.time_slice = calc_wrr_timeslice(p->wrr.weight);
 	p->wrr.on_rq = 0;
@@ -4297,10 +4298,20 @@ int sched_setscheduler(struct task_struct *p, int policy,
 		       const struct sched_param *param)
 {
 	/* OS Project 3 */
+
+	// if WRR_CPU_EMPTY is only cpu selected for WRR task, fail.
 	if (policy == SCHED_WRR &&
 		p->nr_cpus_allowed < 2 &&
 		cpumask_test_cpu(WRR_CPU_EMPTY, &p->cpus_allowed)) {
 			return -EINVAL;
+	}
+
+	// else, unmask WRR_CPU_EMPTY from cpu mask and try to assign other cpu
+	if (policy == SCHED_WRR) {
+		cpumask_t newmask;
+		cpumask_copy(&newmask, &p->cpus_allowed);
+		cpumask_clear_cpu(WRR_CPU_EMPTY, &newmask);
+		sched_setaffinity(p->pid, &newmask);
 	}
 
 	return _sched_setscheduler(p, policy, param, true);

@@ -3,6 +3,7 @@
 #include "sched.h"
 
 static void do_load_balance(void);
+static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int flags);
 
 unsigned int calc_wrr_timeslice(unsigned int weight) {
 	return weight * WRR_TIMESLICE;
@@ -15,6 +16,7 @@ void init_wrr_rq(struct wrr_rq *wrr_rq) {
 
 	array = &wrr_rq->active;
 	INIT_LIST_HEAD(&array->queue);
+	// INIT_LIST_HEAD(&wrr_rq->pending_tasks);
 	
 	wrr_rq->wrr_nr_running = 0;
 	wrr_rq->weight_sum = 0;
@@ -106,6 +108,7 @@ static void __enqueue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se,
 	// inc_rt_tasks(rt_se, rt_rq);
 	wrr_rq->wrr_nr_running += 1;
 	wrr_rq->weight_sum += wrr_se->weight;
+	add_nr_running(rq, 1);
 }
 
 static void enqueue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, unsigned int flags)
@@ -117,8 +120,15 @@ static void enqueue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, u
 static void enqueue_task_wrr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_wrr_entity *wrr_se = &p->wrr;
-
+	int cpu = cpu_of(rq);
 	printk(KERN_INFO "Enqueue WRR run queue %d\n", p->pid);
+
+	// if (!task_current(rq, p) && cpu == WRR_CPU_EMPTY) {
+	// 	struct wrr_rq *wrr_rq = &rq->wrr;
+	// 	list_add_tail(&p->pending_tasks, &wrr_rq->pending_tasks);
+	// 	printk(KERN_INFO "%d in %d added to pending tasks\n", p->pid, cpu);
+	// 	return;
+	// }
 
 	enqueue_wrr_entity(rq, wrr_se, flags);
 }
@@ -136,6 +146,7 @@ static void __dequeue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se,
 	// dec_rt_tasks(rt_se, rt_rq);
 	wrr_rq->wrr_nr_running -= 1;
 	wrr_rq->weight_sum -= wrr_se->weight;
+	sub_nr_running(rq, 1);
 }
 
 static void dequeue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, unsigned int flags)
@@ -242,7 +253,7 @@ static struct task_struct *_pick_next_task_wrr(struct rq *rq)
 static struct task_struct * pick_next_task_wrr(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 {
 	struct task_struct *p;
-	// struct wrr_rq *wrr_rq = &rq->wrr;
+	struct wrr_rq *wrr_rq = &rq->wrr;
 
 	// printk(KERN_INFO "Pick next task WRR\n");
 
@@ -251,6 +262,38 @@ static struct task_struct * pick_next_task_wrr(struct rq *rq, struct task_struct
 
 	// if (!wrr_rq->wrr_queued)
 	// 	return NULL;
+
+	// if (!list_empty_careful(&wrr_rq->pending_tasks)) {
+	// 	int cpu = cpu_of(rq);
+	// 	unsigned long irqflags;
+	// 	int target_cpu;
+	// 	struct rq *target_rq;
+	// 	struct task_struct *p = list_entry(wrr_rq->pending_tasks.next, struct task_struct, pending_tasks);
+
+	// 	printk(KERN_INFO "Cannot enqueue to WRR_CPU_EMPTY, trying to migrate\n");
+	// 	target_cpu = select_task_rq_wrr(p, cpu, SD_BALANCE_WAKE, 0);
+	// 	target_rq = cpu_rq(target_cpu);
+
+	// 	printk(KERN_INFO "moving %d from cpu %d to %d\n", p->pid, cpu, target_cpu);
+	
+	// 	local_irq_save(irqflags);
+	// 	double_lock_balance(rq, target_rq); 
+
+	// 	// detach_task() in fair.c
+	// 	p->on_rq = TASK_ON_RQ_MIGRATING;
+	// 	deactivate_task(rq, p, DEQUEUE_NOCLOCK);
+	// 	set_task_cpu(p, target_cpu);
+
+	// 	// attach_task() in fair.c
+	// 	activate_task(target_rq, p, ENQUEUE_NOCLOCK);
+	// 	p->on_rq = TASK_ON_RQ_QUEUED;
+	// 	// check_preempt_curr(min_rq, p, 0);
+
+	// 	double_unlock_balance(rq, target_rq); 
+	// 	local_irq_restore(irqflags);
+
+	// 	printk(KERN_INFO "done moving %d from cpu %d to %d\n", p->pid, cpu, target_cpu);
+	// }
 
 	put_prev_task(rq, prev);
 
@@ -273,7 +316,7 @@ static void put_prev_task_wrr(struct rq *rq, struct task_struct *p)
 static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int flags)
 {
 	int cpui;
-	int target_cpu = cpu;
+	int target_cpu = cpu; // Note : this can be WRR_CPU_EMPTY, but it must be, since a process should run anyway.
 	int target_weight_sum = INT_MAX;
 
 	/* For anything but wake ups, just return the task_cpu */
@@ -287,6 +330,9 @@ static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int f
 	for_each_online_cpu(cpui) {
 		struct rq *rq = cpu_rq(cpui);
 		struct wrr_rq *wrr_rq = &rq->wrr;
+
+		if (cpui == WRR_CPU_EMPTY) continue;
+
 		if (cpumask_test_cpu(cpui, &p->cpus_allowed)) {
 			if(wrr_rq->weight_sum < target_weight_sum) {
 				target_weight_sum = wrr_rq->weight_sum;
@@ -386,10 +432,10 @@ static void do_load_balance(void) {
 		int ws = wrr_rq->weight_sum;
 		// TODO: remove this
 		// printk("[lb] cpu: %d / ws: %d\n", cpui, ws);
-		head = &wrr_rq->active.queue;
-		list_for_each_entry(wrr_se, head, run_list) {
-			printk("[lb process] cpu: %d, pid: %d\n", cpui, wrr_task_of(wrr_se)->pid);
-		}
+		// head = &wrr_rq->active.queue;
+		// list_for_each_entry(wrr_se, head, run_list) {
+		// 	printk("[lb process] cpu: %d, pid: %d\n", cpui, wrr_task_of(wrr_se)->pid);
+		// }
 
 		// WRR_CPU_EMPTY cannot participate
 		if (cpui == WRR_CPU_EMPTY) continue;

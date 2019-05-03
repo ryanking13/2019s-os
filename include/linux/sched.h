@@ -613,6 +613,8 @@ struct task_struct {
 	struct sched_rt_entity		rt;
 	/* OS Project 3 */
 	struct sched_wrr_entity		wrr;
+	// struct list_head		pending_tasks;
+
 #ifdef CONFIG_CGROUP_SCHED
 	struct task_group		*sched_task_group;
 #endif
