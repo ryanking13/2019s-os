@@ -120,7 +120,7 @@ static void enqueue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, u
 static void enqueue_task_wrr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_wrr_entity *wrr_se = &p->wrr;
-	int cpu = cpu_of(rq);
+	// int cpu = cpu_of(rq);
 	printk(KERN_INFO "Enqueue WRR run queue %d\n", p->pid);
 
 	// if (!task_current(rq, p) && cpu == WRR_CPU_EMPTY) {
@@ -235,6 +235,7 @@ static struct task_struct *_pick_next_task_wrr(struct rq *rq)
 	struct sched_wrr_entity *wrr_se;
 	struct task_struct *p;
 	struct wrr_rq *wrr_rq  = &rq->wrr;
+	struct cfs_rq *cfs_rq = &rq->cfs;
 
 	wrr_se = pick_next_wrr_entity(rq, wrr_rq);
 
@@ -243,6 +244,12 @@ static struct task_struct *_pick_next_task_wrr(struct rq *rq)
 	}
 
 	// BUG_ON(!wrr_se);
+	// to make CFS process pass through while WRR processes are active,
+	// reserve some time slice for CFS process
+	if (wrr_se->time_slice < WRR_TIMESLICE_BANDWIDTH) {
+		// time slice is in reserved range
+		return NULL;
+	}
 
 	p = wrr_task_of(wrr_se);
 	p->se.exec_start = rq_clock_task(rq);
@@ -253,7 +260,7 @@ static struct task_struct *_pick_next_task_wrr(struct rq *rq)
 static struct task_struct * pick_next_task_wrr(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 {
 	struct task_struct *p;
-	struct wrr_rq *wrr_rq = &rq->wrr;
+	// struct wrr_rq *wrr_rq = &rq->wrr;
 
 	// printk(KERN_INFO "Pick next task WRR\n");
 
@@ -263,47 +270,11 @@ static struct task_struct * pick_next_task_wrr(struct rq *rq, struct task_struct
 	// if (!wrr_rq->wrr_queued)
 	// 	return NULL;
 
-	// if (!list_empty_careful(&wrr_rq->pending_tasks)) {
-	// 	int cpu = cpu_of(rq);
-	// 	unsigned long irqflags;
-	// 	int target_cpu;
-	// 	struct rq *target_rq;
-	// 	struct task_struct *p = list_entry(wrr_rq->pending_tasks.next, struct task_struct, pending_tasks);
-
-	// 	printk(KERN_INFO "Cannot enqueue to WRR_CPU_EMPTY, trying to migrate\n");
-	// 	target_cpu = select_task_rq_wrr(p, cpu, SD_BALANCE_WAKE, 0);
-	// 	target_rq = cpu_rq(target_cpu);
-
-	// 	printk(KERN_INFO "moving %d from cpu %d to %d\n", p->pid, cpu, target_cpu);
-	
-	// 	local_irq_save(irqflags);
-	// 	double_lock_balance(rq, target_rq); 
-
-	// 	// detach_task() in fair.c
-	// 	p->on_rq = TASK_ON_RQ_MIGRATING;
-	// 	deactivate_task(rq, p, DEQUEUE_NOCLOCK);
-	// 	set_task_cpu(p, target_cpu);
-
-	// 	// attach_task() in fair.c
-	// 	activate_task(target_rq, p, ENQUEUE_NOCLOCK);
-	// 	p->on_rq = TASK_ON_RQ_QUEUED;
-	// 	// check_preempt_curr(min_rq, p, 0);
-
-	// 	double_unlock_balance(rq, target_rq); 
-	// 	local_irq_restore(irqflags);
-
-	// 	printk(KERN_INFO "done moving %d from cpu %d to %d\n", p->pid, cpu, target_cpu);
-	// }
 
 	put_prev_task(rq, prev);
 
 	p = _pick_next_task_wrr(rq);
 
-	// TODO: Remove this
-	// if (p != NULL) {
-	// 	int cpu = smp_processor_id();
-	// 	printk("pick next cpu: %d, pid: %d\n", cpu, p->pid);
-	// }
 	return p;
 }
 

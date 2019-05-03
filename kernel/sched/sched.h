@@ -1533,7 +1533,9 @@ extern const struct sched_class idle_sched_class;
 #define WRR_DEFAULT_WEIGHT 10
 // default timeslice is 10ms
 #define WRR_TIMESLICE		(10 * HZ / 1000)
-// CPU ID that must be empty (arbitrarily selecte)
+// timeslice reserved for CFS tasks
+#define WRR_TIMESLICE_BANDWIDTH (5 * HZ / 1000)
+// CPU ID that must be empty (arbitrarily selected)
 #define WRR_CPU_EMPTY 		0x0
 // load balancing period is 2000ms
 #define WRR_LOAD_BALANCE_PERIOD		(2000 * HZ / 1000)

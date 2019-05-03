@@ -48,32 +48,21 @@ int main(int argc, char **argv) {
 
     const struct sched_param params = {0};
 
-    // check WRR scheduler is properly set
-    ret = sched_getscheduler(pid);
-    printf("[(before) getscheduler] %d\n", ret);
-
     // set this process to use WRR scheduler
     ret = sched_setscheduler(pid, SCHED_WRR, &params);
-    printf("[setscheduler] %d\n", ret);
-
-    if (ret < 0) {
-        return 0;
-    }
+    if (ret < 0) return 0;
 
     // check WRR scheduler is properly set
     ret = sched_getscheduler(pid);
-    printf("[(after) getscheduler] %d\n", ret);
+    if (ret < 0) return 0;
 
-    if (ret < 0) {
-        return 0;
-    }
-
-    // set weight to this process
-    ret = SCHED_SETWEIGHT(pid, 15);
-    printf("[setweight] %d\n", ret);
-
-    if (ret < 0) {
-        return 0;
+    int cpu;
+    int weight;
+    for(int i = 0; i < 500000000; i++) {
+        if (i % 100000000 == 0) {
+            cpu = sched_getcpu();
+            printf("pid: %d cpu: %d\n", pid, cpu);
+        }
     }
 
     pid_t newpid;
@@ -82,16 +71,25 @@ int main(int argc, char **argv) {
     if (newpid == 0) {
         pid = getpid();
         int weight = SCHED_GETWEIGHT(pid);
-        printf("Child pid: %d, weight: %d, scheduler: %d\n", pid, weight, sched_getscheduler(pid));
+        SCHED_SETWEIGHT(pid, 15);
+        int new_weight = SCHED_GETWEIGHT(pid);
+        printf("Child pid: %d, prev_weight: %d cur_weight: %d\n", pid, weight, new_weight);
+
+        cpu_set_t mask;
+        int binded_cpu;
+
+        CPU_ZERO(&mask);
+        CPU_SET(cpu, &mask);
+
+        // bind this process to specific cpu
+        ret = sched_setaffinity(pid, sizeof(mask), &mask);
+        if (ret < 0) return 0;
     }
 
-    int cpu;
-    int weight;
     for(int i = 0;; i++) {
-        if (i % 3000000 == 0) {
+        if (i % 100000000 == 0) {
             cpu = sched_getcpu();
-            weight = SCHED_GETWEIGHT(pid);
-            printf("pid: %d cpu: %d ms: %d w: %d\n", pid, cpu, (int)get_time(), weight);
+            printf("pid: %d cpu: %d\n", pid, cpu);
         }
     }
 } 

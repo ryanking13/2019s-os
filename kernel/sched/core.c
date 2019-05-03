@@ -4298,6 +4298,7 @@ int sched_setscheduler(struct task_struct *p, int policy,
 		       const struct sched_param *param)
 {
 	/* OS Project 3 */
+	int ret;
 
 	// if WRR_CPU_EMPTY is only cpu selected for WRR task, fail.
 	if (policy == SCHED_WRR &&
@@ -4305,7 +4306,6 @@ int sched_setscheduler(struct task_struct *p, int policy,
 		cpumask_test_cpu(WRR_CPU_EMPTY, &p->cpus_allowed)) {
 			return -EINVAL;
 	}
-
 	// else, unmask WRR_CPU_EMPTY from cpu mask and try to assign other cpu
 	if (policy == SCHED_WRR) {
 		cpumask_t newmask;
@@ -4314,7 +4314,8 @@ int sched_setscheduler(struct task_struct *p, int policy,
 		sched_setaffinity(p->pid, &newmask);
 	}
 
-	return _sched_setscheduler(p, policy, param, true);
+	ret = _sched_setscheduler(p, policy, param, true);
+	return ret;
 }
 EXPORT_SYMBOL_GPL(sched_setscheduler);
 
