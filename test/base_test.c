@@ -81,6 +81,8 @@ int main(int argc, char **argv) {
 
     if (newpid == 0) {
         pid = getpid();
+        int weight = SCHED_GETWEIGHT(pid);
+        printf("Child pid: %d, weight: %d, scheduler: %d\n", pid, weight, sched_getscheduler(pid));
     }
 
     int cpu;

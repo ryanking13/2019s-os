@@ -2,6 +2,8 @@
 
 #include "sched.h"
 
+static void do_load_balance(void);
+
 unsigned int calc_wrr_timeslice(unsigned int weight) {
 	return weight * WRR_TIMESLICE;
 }
@@ -38,7 +40,7 @@ void trigger_load_balance_wrr(struct rq *rq)
 	// only one cpu must do load balancing
 	if (cpu == cpumask_first(cpu_online_mask)) {
 		// printk(KERN_INFO "do load balance on cpu %d\n", cpu);
-		// TODO: implement
+		do_load_balance();
 	}
 }
 
@@ -188,6 +190,7 @@ static void check_preempt_curr_wrr(struct rq *rq, struct task_struct *p, int fla
 {
 	// no preemption for WRR;
 	printk(KERN_INFO "Check preempt WRR %d\n", p->pid);
+	resched_curr(rq);
 	return;
 }
 
@@ -253,6 +256,11 @@ static struct task_struct * pick_next_task_wrr(struct rq *rq, struct task_struct
 
 	p = _pick_next_task_wrr(rq);
 
+	// TODO: Remove this
+	// if (p != NULL) {
+	// 	int cpu = smp_processor_id();
+	// 	printk("pick next cpu: %d, pid: %d\n", cpu, p->pid);
+	// }
 	return p;
 }
 
@@ -266,9 +274,7 @@ static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int f
 {
 	int cpui;
 	int target_cpu = cpu;
-	int target_weight_sum = cpu_rq(cpu)->wrr.weight_sum;
-
-	printk(KERN_INFO "Select task rq WRR %d\n", p->pid);
+	int target_weight_sum = INT_MAX;
 
 	/* For anything but wake ups, just return the task_cpu */
 	// if (sd_flag != SD_BALANCE_WAKE && sd_flag != SD_BALANCE_FORK)
@@ -278,7 +284,7 @@ static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int f
 	rcu_read_lock();
 
 	// https://stackoverflow.com/questions/24437724/diff-between-various-cpu-masks-linux-kernel
-	for_each_present_cpu(cpui) {
+	for_each_online_cpu(cpui) {
 		struct rq *rq = cpu_rq(cpui);
 		struct wrr_rq *wrr_rq = &rq->wrr;
 		if (cpumask_test_cpu(cpui, &p->cpus_allowed)) {
@@ -289,6 +295,7 @@ static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int f
 		}
 	}
 	rcu_read_unlock();
+	printk(KERN_INFO "Select task rq WRR p:%d cpu: %d\n", p->pid, target_cpu);
 
 	return target_cpu;
 }
@@ -308,9 +315,10 @@ static void task_fork_wrr(struct task_struct *p)
 {
 	/* OS Project 3 */
 	printk(KERN_INFO "fork WRR %d\n", p->pid);
-	INIT_LIST_HEAD(&p->wrr.run_list);
-	p->wrr.time_slice	= calc_wrr_timeslice(p->wrr.weight);
-	p->wrr.on_rq = 0;
+	// INIT_LIST_HEAD(&p->wrr.run_list);
+	// p->wrr.time_slice	= calc_wrr_timeslice(p->wrr.weight);
+	// p->wrr.on_rq = 0;
+	return;
 }
 
 static void set_curr_task_wrr(struct rq *rq)
@@ -334,6 +342,12 @@ static void task_tick_wrr(struct rq *rq, struct task_struct *p, int queued)
 
 	// printk(KERN_INFO "TIMESLICE %d %d\n", p->pid, p->wrr.time_slice);
 
+	// TODO: delete this code,
+	// must not happen case
+	// if (p->wrr.time_slice <= 0) {
+	// 	printk(KERN_INFO "time slice is negative pid: %d\n", p->pid);
+	// }
+
 	if (--p->wrr.time_slice)
 		return;
 
@@ -347,6 +361,101 @@ static void task_tick_wrr(struct rq *rq, struct task_struct *p, int queued)
 		resched_curr(rq);
 		return;
 	}
+}
+
+static void do_load_balance(void) {
+	int cpui;
+	int max_cpu = -1;
+	int min_cpu = -1;
+	struct rq *max_rq;
+	struct rq *min_rq;
+	int min_ws = INT_MAX;
+	int max_ws = -1;
+	struct wrr_rq *max_wrr_rq;
+	struct wrr_rq *min_wrr_rq;
+	struct list_head *head;
+	struct sched_wrr_entity *wrr_se;
+	struct sched_wrr_entity *migrate_target = NULL;
+	int migrate_weight = -1;
+	unsigned long flags;
+
+	rcu_read_lock();
+	for_each_online_cpu(cpui) {
+		struct rq *rq = cpu_rq(cpui);
+		struct wrr_rq *wrr_rq = &rq->wrr;
+		int ws = wrr_rq->weight_sum;
+		// TODO: remove this
+		// printk("[lb] cpu: %d / ws: %d\n", cpui, ws);
+		head = &wrr_rq->active.queue;
+		list_for_each_entry(wrr_se, head, run_list) {
+			printk("[lb process] cpu: %d, pid: %d\n", cpui, wrr_task_of(wrr_se)->pid);
+		}
+
+		// WRR_CPU_EMPTY cannot participate
+		if (cpui == WRR_CPU_EMPTY) continue;
+
+		if (ws > max_ws) {
+			max_ws = ws;
+			max_cpu = cpui;
+		}
+
+		if (ws < min_ws) {
+			min_ws = ws;
+			min_cpu = cpui;
+		}
+	}
+	rcu_read_unlock();
+
+	// nothing to move
+	if (max_cpu == min_cpu) return;
+
+	max_rq = cpu_rq(max_cpu);
+	min_rq = cpu_rq(min_cpu);
+
+
+	// https://enginius.tistory.com/107
+	local_irq_save(flags);
+	double_rq_lock(max_rq, min_rq);
+
+	max_wrr_rq = &max_rq->wrr;
+	min_wrr_rq = &min_rq->wrr;
+	head = &max_wrr_rq->active.queue;
+	list_for_each_entry(wrr_se, head, run_list) {
+		int weight = wrr_se->weight;
+		struct task_struct *p = wrr_task_of(wrr_se);
+
+		// if p is currently running, cannot migrate
+		if (max_rq->curr == p) continue;
+
+		// if p is not allowed to run in min_cpu, cannot migrate
+		if (!cpumask_test_cpu(min_cpu, &p->cpus_allowed)) continue;
+
+		// weight sum should not reversed after migration
+		if (max_ws - weight <= min_ws + weight) continue;
+
+		if (weight > migrate_weight) {
+			migrate_weight = weight;
+			migrate_target = wrr_se;
+		}
+	}
+
+	if (migrate_target != NULL) {
+		struct task_struct *p = wrr_task_of(migrate_target);
+		printk(KERN_INFO "moving %d from cpu %d to %d\n", p->pid, max_cpu, min_cpu);
+		// detach_task() in fair.c
+		p->on_rq = TASK_ON_RQ_MIGRATING;
+		deactivate_task(max_rq, p, DEQUEUE_NOCLOCK);
+		set_task_cpu(p, min_cpu);
+
+		// attach_task() in fair.c
+		activate_task(min_rq, p, ENQUEUE_NOCLOCK);
+		p->on_rq = TASK_ON_RQ_QUEUED;
+		// check_preempt_curr(min_rq, p, 0);
+	}
+
+	double_rq_unlock(max_rq, min_rq);
+	local_irq_restore(flags);
+	return;
 }
 
 const struct sched_class wrr_sched_class = {

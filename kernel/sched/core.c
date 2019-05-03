@@ -4296,6 +4296,13 @@ static int _sched_setscheduler(struct task_struct *p, int policy,
 int sched_setscheduler(struct task_struct *p, int policy,
 		       const struct sched_param *param)
 {
+	/* OS Project 3 */
+	if (policy == SCHED_WRR &&
+		p->nr_cpus_allowed < 2 &&
+		cpumask_test_cpu(WRR_CPU_EMPTY, &p->cpus_allowed)) {
+			return -EINVAL;
+	}
+
 	return _sched_setscheduler(p, policy, param, true);
 }
 EXPORT_SYMBOL_GPL(sched_setscheduler);
