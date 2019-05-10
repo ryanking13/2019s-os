@@ -248,6 +248,11 @@ extern struct cred init_cred;
 		.run_list	= LIST_HEAD_INIT(tsk.rt.run_list),	\
 		.time_slice	= RR_TIMESLICE,				\
 	},								\
+	/* OS Project 3 */\
+	.wrr	= {\
+		.run_list = LIST_HEAD_INIT(tsk.wrr.run_list),\
+	},\
+	/*.pending_tasks = LIST_HEAD_INIT(tsk.pending_tasks),*/\
 	.tasks		= LIST_HEAD_INIT(tsk.tasks),			\
 	INIT_PUSHABLE_TASKS(tsk)					\
 	INIT_CGROUP_SCHED(tsk)						\

@@ -2203,6 +2203,13 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->rt.on_rq		= 0;
 	p->rt.on_list		= 0;
 
+	/* OS Project 3 */
+	INIT_LIST_HEAD(&p->wrr.run_list);
+	// INIT_LIST_HEAD(&p->pending_tasks);
+	p->wrr.weight = current->wrr.weight;
+	p->wrr.time_slice = calc_wrr_timeslice(p->wrr.weight);
+	p->wrr.on_rq = 0;
+
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	INIT_HLIST_HEAD(&p->preempt_notifiers);
 #endif
@@ -2389,7 +2396,13 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 		return -EAGAIN;
 	} else if (rt_prio(p->prio)) {
 		p->sched_class = &rt_sched_class;
-	} else {
+	} 
+	/* OS Project 3 */
+	else if (p->policy == SCHED_WRR) {
+		p->sched_class = &wrr_sched_class;
+		p->wrr.weight = current->wrr.weight;
+	}
+	else {
 		p->sched_class = &fair_sched_class;
 	}
 
@@ -3040,6 +3053,8 @@ void scheduler_tick(void)
 #ifdef CONFIG_SMP
 	rq->idle_balance = idle_cpu(cpu);
 	trigger_load_balance(rq);
+	/* OS Project 3 */
+	trigger_load_balance_wrr(rq);
 #endif
 	rq_last_tick_reset(rq);
 }
@@ -3985,6 +4000,12 @@ static void __setscheduler(struct rq *rq, struct task_struct *p,
 		p->sched_class = &dl_sched_class;
 	else if (rt_prio(p->prio))
 		p->sched_class = &rt_sched_class;
+	/* OS Project 3 */
+	else if (p->policy == SCHED_WRR) {
+		p->sched_class = &wrr_sched_class;
+		p->wrr.weight = WRR_DEFAULT_WEIGHT;
+		p->wrr.time_slice = calc_wrr_timeslice(p->wrr.weight);
+	}
 	else
 		p->sched_class = &fair_sched_class;
 }
@@ -4276,7 +4297,25 @@ static int _sched_setscheduler(struct task_struct *p, int policy,
 int sched_setscheduler(struct task_struct *p, int policy,
 		       const struct sched_param *param)
 {
-	return _sched_setscheduler(p, policy, param, true);
+	/* OS Project 3 */
+	int ret;
+
+	// if WRR_CPU_EMPTY is only cpu selected for WRR task, fail.
+	if (policy == SCHED_WRR &&
+		p->nr_cpus_allowed < 2 &&
+		cpumask_test_cpu(WRR_CPU_EMPTY, &p->cpus_allowed)) {
+			return -EINVAL;
+	}
+	// else, unmask WRR_CPU_EMPTY from cpu mask and try to assign other cpu
+	if (policy == SCHED_WRR) {
+		cpumask_t newmask;
+		cpumask_copy(&newmask, &p->cpus_allowed);
+		cpumask_clear_cpu(WRR_CPU_EMPTY, &newmask);
+		sched_setaffinity(p->pid, &newmask);
+	}
+
+	ret = _sched_setscheduler(p, policy, param, true);
+	return ret;
 }
 EXPORT_SYMBOL_GPL(sched_setscheduler);
 
@@ -5057,6 +5096,8 @@ SYSCALL_DEFINE1(sched_get_priority_max, int, policy)
 	case SCHED_NORMAL:
 	case SCHED_BATCH:
 	case SCHED_IDLE:
+	/* OS Project 3 */
+	case SCHED_WRR:
 		ret = 0;
 		break;
 	}
@@ -5084,6 +5125,8 @@ SYSCALL_DEFINE1(sched_get_priority_min, int, policy)
 	case SCHED_NORMAL:
 	case SCHED_BATCH:
 	case SCHED_IDLE:
+	/* OS Project 3 */
+	case SCHED_WRR:
 		ret = 0;
 	}
 	return ret;
@@ -5865,6 +5908,9 @@ void __init sched_init(void)
 		init_cfs_rq(&rq->cfs);
 		init_rt_rq(&rq->rt);
 		init_dl_rq(&rq->dl);
+		/* OS Project 3 */
+		init_wrr_rq(&rq->wrr);
+
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.shares = ROOT_TASK_GROUP_LOAD;
 		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
@@ -6756,3 +6802,91 @@ const u32 sched_prio_to_wmult[40] = {
  /*  10 */  39045157,  49367440,  61356676,  76695844,  95443717,
  /*  15 */ 119304647, 148102320, 186737708, 238609294, 286331153,
 };
+
+/* OS project 3 */
+
+/*
+ * Set the SCHED_WRR weight of process, as identified by 'pid'.
+ * If 'pid' is 0, set the weight for the calling process.
+ * System call number 398.
+ */
+long sched_setweight(pid_t pid, int weight) {
+	struct rq_flags rf;
+	struct task_struct *p;
+	struct rq *rq;
+	int prev_weight;
+
+	int curr_euid = current_euid().val;
+
+	// invalid weight
+	if (weight < 1 || weight > 20)
+		return -EINVAL;
+
+	// invalid pid (< 0)
+	if (pid < 0)
+		return -EINVAL;
+
+	p = find_process_by_pid(pid);
+
+	task_rq_lock(p, &rf);
+	rq = task_rq(p);
+
+	// invalid pid (not WRR scheduler)
+	if (p->policy != SCHED_WRR) {
+		task_rq_unlock(rq, p, &rf);
+		return -EINVAL;
+	}
+	
+	// if you are not root and trying to raise weight
+	if (p->wrr.weight < weight && curr_euid != 0) {
+		task_rq_unlock(rq, p, &rf);
+		return -EPERM;
+	}
+
+	// if you are not root & not process owner and trying to lower weight
+	if (p->wrr.weight >= weight && (curr_euid != 0 && !check_same_owner(p))) {
+		task_rq_unlock(rq, p, &rf);
+		return -EPERM;
+	}
+
+	prev_weight = p->wrr.weight;
+	if (p->wrr.on_rq) {
+		rq->wrr.weight_sum += (weight - prev_weight);
+	}
+	p->wrr.weight = weight;
+	
+	// success
+	task_rq_unlock(rq, p, &rf);
+	return 0;
+}
+
+/*
+ * Obtain the SCHED_WRR weight of a process as identified by 'pid'.
+ * If 'pid' is 0, return the weight of the calling process.
+ * System call number 399.
+ */
+long sched_getweight(pid_t pid) {
+	struct task_struct *p;
+	
+	// invalid pid (< 0)
+	if (pid < 0)
+		return -EINVAL;
+
+	p = find_process_by_pid(pid);
+
+	// invalid pid (not WRR scheduler)
+	if (p->policy != SCHED_WRR) 
+		return -EINVAL;
+
+	return p->wrr.weight;
+}
+
+SYSCALL_DEFINE2(sched_setweight, pid_t, pid, int, weight)
+{
+    return sched_setweight(pid, weight);
+}
+
+SYSCALL_DEFINE1(sched_getweight, pid_t, pid)
+{
+    return sched_getweight(pid);
+}
