@@ -85,6 +85,14 @@ int main(int argc, char **argv) {
         printf("Child pid: %d, weight: %d, scheduler: %d\n", pid, weight, sched_getscheduler(pid));
     }
 
+    newpid = fork();
+    
+    if (newpid == 0) {
+        pid = getpid();
+        int weight = SCHED_GETWEIGHT(pid);
+        printf("Child pid: %d, weight: %d, scheduler: %d\n", pid, weight, sched_getscheduler(pid));
+    }
+
     int cpu;
     int weight;
     for(int i = 0;; i++) {
