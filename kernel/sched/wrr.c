@@ -12,7 +12,7 @@ unsigned int calc_wrr_timeslice(unsigned int weight) {
 /* OS Project 3 */
 void init_wrr_rq(struct wrr_rq *wrr_rq) {
 	struct wrr_array *array;
-	printk(KERN_INFO "Init WRR run queue\n");
+	// printk(KERN_INFO "Init WRR run queue\n");
 
 	array = &wrr_rq->active;
 	INIT_LIST_HEAD(&array->queue);
@@ -121,7 +121,7 @@ static void enqueue_task_wrr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_wrr_entity *wrr_se = &p->wrr;
 	// int cpu = cpu_of(rq);
-	printk(KERN_INFO "Enqueue WRR run queue %d\n", p->pid);
+	// printk(KERN_INFO "Enqueue WRR run queue %d\n", p->pid);
 
 	// if (!task_current(rq, p) && cpu == WRR_CPU_EMPTY) {
 	// 	struct wrr_rq *wrr_rq = &rq->wrr;
@@ -160,7 +160,7 @@ static void dequeue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, u
 static void dequeue_task_wrr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_wrr_entity *wrr_se = &p->wrr;
-	printk(KERN_INFO "Dequeue WRR %d\n", p->pid);
+	// printk(KERN_INFO "Dequeue WRR %d\n", p->pid);
 
 	update_curr_wrr(rq);
 	dequeue_wrr_entity(rq, wrr_se, flags);
@@ -193,14 +193,14 @@ static void requeue_task_wrr(struct rq *rq, struct task_struct *p)
 
 static void yield_task_wrr(struct rq *rq)
 {
-	printk(KERN_INFO "Yield WRR\n");
+	// printk(KERN_INFO "Yield WRR\n");
 	requeue_task_wrr(rq, rq->curr);
 }
 
 static void check_preempt_curr_wrr(struct rq *rq, struct task_struct *p, int flags)
 {
 	// no preemption for WRR;
-	printk(KERN_INFO "Check preempt WRR %d\n", p->pid);
+	// printk(KERN_INFO "Check preempt WRR %d\n", p->pid);
 	resched_curr(rq);
 	return;
 }
@@ -208,7 +208,7 @@ static void check_preempt_curr_wrr(struct rq *rq, struct task_struct *p, int fla
 static void prio_changed_wrr(struct rq *rq, struct task_struct *p, int oldprio)
 {
 	// priority have no effect for WRR;
-	printk(KERN_INFO "Prio changed WRR %d\n", p->pid);
+	// printk(KERN_INFO "Prio changed WRR %d\n", p->pid);
 	return;
 }
 
@@ -235,7 +235,6 @@ static struct task_struct *_pick_next_task_wrr(struct rq *rq)
 	struct sched_wrr_entity *wrr_se;
 	struct task_struct *p;
 	struct wrr_rq *wrr_rq  = &rq->wrr;
-	struct cfs_rq *cfs_rq = &rq->cfs;
 
 	wrr_se = pick_next_wrr_entity(rq, wrr_rq);
 
@@ -246,10 +245,10 @@ static struct task_struct *_pick_next_task_wrr(struct rq *rq)
 	// BUG_ON(!wrr_se);
 	// to make CFS process pass through while WRR processes are active,
 	// reserve some time slice for CFS process
-	if (wrr_se->time_slice < WRR_TIMESLICE_BANDWIDTH) {
-		// time slice is in reserved range
-		return NULL;
-	}
+	// if (wrr_se->time_slice < WRR_TIMESLICE_BANDWIDTH) {
+	// 	// time slice is in reserved range
+	// 	return NULL;
+	// }
 
 	p = wrr_task_of(wrr_se);
 	p->se.exec_start = rq_clock_task(rq);
@@ -312,7 +311,7 @@ static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int f
 		}
 	}
 	rcu_read_unlock();
-	printk(KERN_INFO "Select task rq WRR p:%d cpu: %d\n", p->pid, target_cpu);
+	// printk(KERN_INFO "Select task rq WRR p:%d cpu: %d\n", p->pid, target_cpu);
 
 	return target_cpu;
 }
@@ -321,7 +320,7 @@ static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int f
 // try reschedule without checking priority (not very efficient)
 static void switched_to_wrr(struct rq *rq, struct task_struct *p)
 {
-	printk(KERN_INFO "switched to WRR %d\n", p->pid);
+	// printk(KERN_INFO "switched to WRR %d\n", p->pid);
 	if (task_on_rq_queued(p) && rq->curr != p) {
 		resched_curr(rq);
 	}
@@ -331,7 +330,7 @@ static void switched_to_wrr(struct rq *rq, struct task_struct *p)
 static void task_fork_wrr(struct task_struct *p)
 {
 	/* OS Project 3 */
-	printk(KERN_INFO "fork WRR %d\n", p->pid);
+	// printk(KERN_INFO "fork WRR %d\n", p->pid);
 	// INIT_LIST_HEAD(&p->wrr.run_list);
 	// p->wrr.time_slice	= calc_wrr_timeslice(p->wrr.weight);
 	// p->wrr.on_rq = 0;
@@ -341,7 +340,7 @@ static void task_fork_wrr(struct task_struct *p)
 static void set_curr_task_wrr(struct rq *rq)
 {
 	struct task_struct *p = rq->curr;
-	printk(KERN_INFO "Set curr task WRR\n");
+	// printk(KERN_INFO "Set curr task WRR\n");
 
 	p->se.exec_start = rq_clock_task(rq);
 }
