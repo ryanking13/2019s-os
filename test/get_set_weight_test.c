@@ -10,15 +10,6 @@
 #define SCHED_SETWEIGHT(pid, weight) syscall(398, pid, weight)
 #define SCHED_GETWEIGHT(pid) syscall(399, pid)
 
-double get_time() {
-    struct timeval t;
-    double dtime;
-    gettimeofday(&t, NULL);
-    dtime = t.tv_sec * 1000 + (t.tv_usec / 1000);
-    return dtime;
-}
-
-
 int main(int argc, char **argv) {
     int ret = -1;
     int cpu;
@@ -45,14 +36,15 @@ int main(int argc, char **argv) {
 
     // TEST1 : higher / lower weight with WRR process(curr process)
     printf("===============================================\n");
-    printf("TEST1 - higher & lower weight with curr process\n");
+    printf("TEST1 - increase & decrease weight with curr process\n");
 
-    SCHED_SETWEIGHT(pid, 5);
+    if(ret = SCHED_SETWEIGHT(pid, 5)<0)
+        printf("weight decreasing failed\n");
 
     for(int i=0;i<100000000;i++)
         ; //spin
 
-    for(int t=0;i<4; i++)
+    for(int t=0;!(ret<0)&&i<4; i++)
     {
         for(int i = 0; i < 500000000; i++) {
             if (i % 100000000 == 0) {
@@ -61,25 +53,39 @@ int main(int argc, char **argv) {
                 printf("pid: %d\tcpu: %d\tweight: %d\n", pid, cpu);
             }
         }
-        if(t%2)
-            SCHED_SETWEIGHT(pid,15);
-        else
-            SCHED_SETWEIGHT(pid,5);
+        if(t%2){
+            if(ret = SCHED_SETWEIGHT(pid,15)<0){
+                printf("weight increasing failed\n");
+                break;
+            }
+        }
+        else{
+            if(ret = SCHED_SETWEIGHT(pid,5)<0){
+                printf("weight decreasing failed\n");
+                break;
+            }
+        }
     }
 
     // TEST2 : get / set weight fail test
     printf("===============================================\n");
     printf("TEST2 - get / set weight fail test\n");
 
-    printf("if process is not working with WRR scheduler\n");
-    weight = SCHED_GETWEIGHT(1);
-    weight = SCHED_SETWEIGHT(1,15);
+    printf("if process is not working on WRR\n");
+    printf("suppose pid 1 process (kthreadd) is not working on WRR\n");
+    if(weight = SCHED_GETWEIGHT(1)<0)
+        printf("getweight failed\n");
+    if(ret = SCHED_SETWEIGHT(1,15)<0)
+        printf("setweight failed\n");
 
     printf("if process does not exist\n");
-    weight = SCHED_GETWEIGHT(2147483647);
-    weight = SCHED_SETWEIGHT(2147483647,15);
+    if(weight = SCHED_GETWEIGHT(2147483647)<0)
+        printf("getweight failed\n");
+    if(ret = SCHED_SETWEIGHT(2147483647,15)<0)
+        printf("setweight failed\n");
 
     printf("if given weight is not in specific range [1,20]");
-    weight = SCHED_SETWEIGHT(pid, 30);
+    if(ret = SCHED_SETWEIGHT(pid, 30)<0)
+        printf("setweight failed\n");
 
 } 
