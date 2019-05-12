@@ -192,7 +192,6 @@ WRR scheduler를 구현하기 위해, sched_class struct에 요구되는 아래�
 `pick_next_task`는 WRR 스케쥴러가 스케쥴링할 태스크를 찾고자 할때 호출된다.
 
 1. wrr_rq의 리스트 제일 앞에 위치한 태스크를 반환한다.
-2. 단, 해당 태스크의 time_slice가 일정한 값 이하 (5 = 5ms)이하 일 때는 NULL을 반환한다. (이에 대한 이유는 discussion에서 서술함)
 
 #### select_task_rq
 
@@ -244,14 +243,7 @@ load balancing 과정은 다음과 같다.
 
 ### 3. Discussion
 
-#### Bandwidth for CFS Task
-
-WRR 태스크는 CFS 태스크보다 우선순위가 높기 때문에, WRR 태스크가 끝나지 않고 CPU를 점유하고 있다면
-CFS 태스크가 실행될 수 없다.
-
-RT 스케쥴러에서는 동일한 문제를 RT 스케쥴러가 CPU를 점유 할 수 있는 bandwidth를 지정하는 방식으로 해결하였는데, RT 스케쥴러의 bandwidth 구현은 상당히 복잡하므로, 본 프로젝트에서는 WRR 태스크가 가진 time_slice의 일부를 CFS 태스크를 위해 할당하는 단순한 방식으로 문제를 해결하였다.
-
-`pick_next_task`가 호출될 때에, 현재 wrr_rq의 맨 앞에 있는 (=실행되어야 하는) WRR 태스크의 time_slice가 5ms 이하로 남아있을 경우, `pick_next_task` 해당 태스크를 리턴하지 않고 NULL을 리턴하게 하여, CFS 태스크가 실행될 수 있도록 하였다. 즉, weight가 10인 WRR 태스크인 경우 100ms의 시간을 할당받는데, 이 중 95ms는 WRR 태스크가 수행되고, 5ms는 CFS 태스크가 수행되도록 구현하였다.
+TODO
 
 ### 4. Test code
 
