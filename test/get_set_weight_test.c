@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     for(int i=0;i<100000000;i++)
         ; //spin
 
-    for(int t=0;!(ret<0)&&i<4; i++)
+    for(int t=0;!(ret<0)&&t<4; t++)
     {
         for(int i = 0; i < 500000000; i++) {
             if (i % 100000000 == 0) {
