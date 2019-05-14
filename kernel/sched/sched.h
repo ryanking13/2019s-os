@@ -1218,10 +1218,6 @@ static inline void set_task_rq(struct task_struct *p, unsigned int cpu)
 	p->rt.rt_rq  = tg->rt_rq[cpu];
 	p->rt.parent = tg->rt_se[cpu];
 #endif
-
-	/* OS Project 3 */
-	struct rq *rq = cpu_rq(cpu);
-	p->wrr.wrr_rq = &rq->wrr;
 }
 
 #else /* CONFIG_CGROUP_SCHED */

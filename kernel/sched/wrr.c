@@ -457,7 +457,7 @@ static void do_load_balance(void) {
 
 	if (migrate_target != NULL) {
 		struct task_struct *p = wrr_task_of(migrate_target);
-		printk(KERN_INFO "moving %d from cpu %d to %d\n", p->pid, max_cpu, min_cpu);
+		// printk(KERN_INFO "moving %d from cpu %d to %d\n", p->pid, max_cpu, min_cpu);
 		// detach_task() in fair.c
 		p->on_rq = TASK_ON_RQ_MIGRATING;
 		deactivate_task(max_rq, p, DEQUEUE_NOCLOCK);
