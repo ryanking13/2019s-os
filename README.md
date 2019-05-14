@@ -243,7 +243,7 @@ load balancing 과정은 다음과 같다.
 - cpumask가 0번 CPU에만 할당이 가능하도록 되어있는 경우: scheduler를 변경하지 않고 syscall이 에러를 리턴함
 - cpumask가 0번 CPU를 포함한 두 개 이상의 CPU에 할당이 가능하도록 되어있는 경우: scheduler 변경 후 0번 CPU를 cpumask에서 지우고 리턴함
 
-### 3. Dicussion
+### 3. Discussion
 
 #### Disabling NO_HZ option
 
