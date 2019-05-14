@@ -6830,6 +6830,8 @@ long sched_setweight(pid_t pid, int weight) {
 
 	p = find_process_by_pid(pid);
 
+	if (p == NULL) return -EINVAL;
+
 	task_rq_lock(p, &rf);
 	rq = task_rq(p);
 
@@ -6877,7 +6879,7 @@ long sched_getweight(pid_t pid) {
 	p = find_process_by_pid(pid);
 
 	// invalid pid (not WRR scheduler)
-	if (p->policy != SCHED_WRR) 
+	if (p == NULL || p->policy != SCHED_WRR) 
 		return -EINVAL;
 
 	return p->wrr.weight;
