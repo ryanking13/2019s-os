@@ -97,6 +97,8 @@ sudo ./build_test.py --eject    # eject sdcard after upload
 - [kernel/sched/sched.h](./kernel/sched/sched.h)
   - `wrr_rq` sturct 정의, rq에 `wrr_rq wrr` 속성 추가
   - 필요한 매크로 및 상수 정의
+    - WRR_TIMESLICE: (10 * HZ / 1000)
+    - WRR_LOAD_BALANCE_PERIOD: (2000 * HZ / 1000)
 
 - [kernel/sched/wrr.c](./kernel/sched/wrr.c)
   - `wrr_sched_class` 구현
@@ -239,15 +241,44 @@ load balancing 과정은 다음과 같다.
 이때, 3번의 경우는 다음과 같이 구현하였다.
 
 - cpumask가 0번 CPU에만 할당이 가능하도록 되어있는 경우: scheduler를 변경하지 않고 syscall이 에러를 리턴함
-- cpumask가 0번 CPU를 포함한 두 개 이상의 CPU에 할당이 가능하도록 되어있는 경우: 0번 CPU를 cpumask에서 지우고 이후의 syscall 과정을 진행함.
+- cpumask가 0번 CPU를 포함한 두 개 이상의 CPU에 할당이 가능하도록 되어있는 경우: scheduler 변경 후 0번 CPU를 cpumask에서 지우고 리턴함
 
-### 3. Discussion
+### 3. Dicussion
 
-TODO
+#### Disabling NO_HZ option
+
+리눅스에서는 주기적인 timer inturrupt로 인한 overhead를 줄이기 위해서, CPU가 idle 상태인 경우, 즉 tick에 따른 별다른 동작을 수행할 필요가 없는 경우, tick을 끄는 __NO_HZ__ 옵션을 제공한다. 전력 소모 측면에서는 이러한 옵션을 활용하는 것이 옳겠으나, 본 프로젝트에서는 tick을 이용하여 time slice를 계산한 경우 NO_HZ 옵션으로 인하여 WRR 프로세스들이 정확한 시간 간격으로 load balancing 되지 않는 문제가 발생할 수 있다.
+
+따라서 우리는 이러한 문제를 방지하기 위해 NO_HZ 옵션을 끄고 커널을 빌드하는 것을 선택하였다.
+
+[tizen_bcmrpi3_config](arch/arm64/configs/_tizen_bcmrpi3_defconfig) 파일을 아래와 같이 수정하였다.
+
+__before__
+
+```
+CONFIG_NO_HZ_COMMON=y
+# CONFIG_HZ_PERIODIC is not set
+CONFIG_NO_HZ_IDLE=y
+# CONFIG_NO_HZ_FULL is not set
+CONFIG_NO_HZ=y
+```
+
+__after__
+
+```
+#CONFIG_NO_HZ_COMMON=y
+CONFIG_HZ_PERIODIC=y
+#CONFIG_NO_HZ_IDLE=y
+# CONFIG_NO_HZ_FULL is not set
+#CONFIG_NO_HZ=y
+```
 
 ### 4. Test code
 
-TODO
+- `cpu_test.c`, `fork_test.c`, `get_set_weight_test.c`, `set_weight_target.c`
+  - 기본적인 unit test 코드
+
+- TODO
 
 ## 5. Lessons learned
 
