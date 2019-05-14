@@ -32,8 +32,11 @@ int main(int argc, char **argv) {
     const struct sched_param params1 = {0};
 
     // set this process to use RR scheduler
-    ret = sched_setscheduler(pid, SCHED_RR, &params1);
-    if (ret < 0) return 0;
+    // ret = sched_setscheduler(pid, SCHED_RR, &params1);
+    // if (ret < 0) {
+    //     printf("Change to RR scheduler failed\n");
+    //     return 0;
+    // }
     
     for(int t=0;t<100000000;t++)
         ; //spin

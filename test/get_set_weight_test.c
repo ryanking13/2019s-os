@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
             if (i % 100000000 == 0) {
                 cpu = sched_getcpu();
                 weight = SCHED_GETWEIGHT(pid);
-                printf("pid: %d\tcpu: %d\tweight: %d\n", pid, cpu);
+                printf("pid: %d\tcpu: %d\tweight: %d\n", pid, cpu, weight);
             }
         }
         if(t%2){

@@ -39,26 +39,39 @@ int main(int argc, char **argv) {
     for(int i=0;i<100000000;i++)
         ; //spin
 
-    for(int t=0;!(ret<0)&&t<4; t++)
-    {
-        for(int i = 0; i < 500000000; i++) {
-            if (i % 100000000 == 0) {
-                cpu = sched_getcpu();
-                weight = SCHED_GETWEIGHT(pid);
-                printf("pid: %d\tcpu: %d\tweight: %d\n", pid, cpu);
-            }
-        }
-        if(t%2){
-            if(ret = SCHED_SETWEIGHT(pid,15)<0){
-                printf("weight increasing failed\n");
-                break;
-            }
-        }
-        else{
-            if(ret = SCHED_SETWEIGHT(pid,5)<0){
-                printf("weight decreasing failed\n");
-                break;
-            }
-        }
+    if(ret = SCHED_SETWEIGHT(pid,5)<0){
+        printf("weight decreasing failed\n");
+        return 0;
+    }    
+
+    for(int i=0;i<500000000;i++)
+        ; //spin
+
+    if(ret = SCHED_SETWEIGHT(pid,13)<0){
+        printf("weight increasing failed\n");
+        return 0;
     }
+
+    // for(int t=0;!(ret<0)&&t<4; t++)
+    // {
+    //     for(int i = 0; i < 500000000; i++) {
+    //         if (i % 100000000 == 0) {
+    //             cpu = sched_getcpu();
+    //             weight = SCHED_GETWEIGHT(pid);
+    //             printf("pid: %d\tcpu: %d\tweight: %d\n", pid, cpu, weight);
+    //         }
+    //     }
+    //     if(t%2){
+    //         if(ret = SCHED_SETWEIGHT(pid,15)<0){
+    //             printf("weight increasing failed\n");
+    //             break;
+    //         }
+    //     }
+    //     else{
+    //         if(ret = SCHED_SETWEIGHT(pid,5)<0){
+    //             printf("weight decreasing failed\n");
+    //             break;
+    //         }
+    //     }
+    // }
 } 
