@@ -9,7 +9,14 @@
 #define SET_GPS_LOCATION(loc) syscall(398, loc)
 
 int main(int argc, char **argv) {
-    struct gps_location *loc;
-    int ret = SET_GPS_LOCATION(loc);
+    struct gps_location loc;
+
+    loc.lat_integer = 0;
+    loc.lng_integer = 0;
+    loc.lat_fractional = 0;
+    loc.lng_fractional = 0;
+    loc.accuracy = 0;
+
+    int ret = SET_GPS_LOCATION(&loc);
     printf("ret: %d\n", ret);
 }
