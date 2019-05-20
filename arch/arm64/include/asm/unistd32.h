@@ -818,6 +818,9 @@ __SYSCALL(__NR_pkey_free, sys_pkey_free)
 #define __NR_statx 397
 __SYSCALL(__NR_statx, sys_statx)
 
+#define __NR_set_gps_location 398
+__SYSCALL(__NR_set_gps_location, sys_set_gps_location)
+
 /*
  * Please add new compat syscalls above this comment and update
  * __NR_compat_syscalls in asm/unistd.h.
