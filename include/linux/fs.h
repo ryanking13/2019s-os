@@ -670,6 +670,13 @@ struct inode {
 #endif
 
 	void			*i_private; /* fs or device private pointer */
+
+	/* OS Project 4 */
+	int				i_lat_integer;
+	int				i_lat_fractional;
+	int				i_lng_interger;
+	int				i_lng_fractional;
+	int				i_accuracy;
 } __randomize_layout;
 
 static inline unsigned int i_blocksize(const struct inode *node)
@@ -1758,6 +1765,9 @@ struct inode_operations {
 			   umode_t create_mode, int *opened);
 	int (*tmpfile) (struct inode *, struct dentry *, umode_t);
 	int (*set_acl)(struct inode *, struct posix_acl *, int);
+	/* OS Project 4 */
+	int (*set_gps_location)(struct inode *);
+	int (*get_gps_location)(struct inode *, struct gps_location *);
 } ____cacheline_aligned;
 
 static inline ssize_t call_read_iter(struct file *file, struct kiocb *kio,
