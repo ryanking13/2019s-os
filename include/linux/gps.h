@@ -18,4 +18,9 @@ struct gps_location {
   int accuracy;
 };
 
+/* global gps_location struct */
+struct gps_location init_location;
+inline void location_lock(void);
+inline void location_unlock(void);
+
 #endif

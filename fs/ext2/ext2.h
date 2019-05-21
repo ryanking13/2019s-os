@@ -351,6 +351,11 @@ struct ext2_inode {
 			__u32	m_i_reserved2[2];
 		} masix2;
 	} osd2;				/* OS dependent 2 */
+	/* OS Project 4 */
+	__le32 i_lat_integer;
+	__le32 i_lat_fractional;
+	__le32 i_lng_integer;
+	__le32 i_lng_fractional;
 };
 
 #define i_size_high	i_dir_acl
@@ -706,6 +711,12 @@ struct ext2_inode_info {
 #ifdef CONFIG_QUOTA
 	struct dquot *i_dquot[MAXQUOTAS];
 #endif
+
+	/* OS Project 4 */
+	__le32 i_lat_integer;
+	__le32 i_lat_fractional;
+	__le32 i_lng_integer;
+	__le32 i_lng_fractional;
 };
 
 #ifdef CONFIG_FS_DAX

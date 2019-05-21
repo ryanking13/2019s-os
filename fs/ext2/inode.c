@@ -39,6 +39,8 @@
 #include "ext2.h"
 #include "acl.h"
 #include "xattr.h"
+/* OS Project 4 */
+#include <linux/gps.h>
 
 static int __ext2_write_inode(struct inode *inode, int do_sync);
 

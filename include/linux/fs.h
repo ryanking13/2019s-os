@@ -39,6 +39,9 @@
 #include <asm/byteorder.h>
 #include <uapi/linux/fs.h>
 
+/* OS Project 4 */
+#include <linux/gps.h>
+
 struct backing_dev_info;
 struct bdi_writeback;
 struct bio;
