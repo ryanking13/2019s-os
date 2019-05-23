@@ -5,18 +5,28 @@
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
+#include <linux/namei.h>
 
 struct gps_location init_location = INIT_GPS_LOCATION(init_location);
 EXPORT_SYMBOL(init_location);
 
 DEFINE_SPINLOCK(loc_lock);
 
-inline void location_lock(void) {
+void location_lock(void) {
     spin_lock(&loc_lock);
 }
 
-inline void location_unlock(void) {
+void location_unlock(void) {
     spin_unlock(&loc_lock);
+}
+
+int can_access_here(struct gps_location *file_loc) {
+    int ret = 1;
+    struct gps_location *here = &init_location;
+    location_lock();
+    // TODO
+    location_unlock();
+    return 1;
 }
 
 long set_gps_location(struct gps_location __user *loc) {
@@ -34,7 +44,7 @@ long set_gps_location(struct gps_location __user *loc) {
     }
 
     if (_loc->lat_integer < -90 || _loc->lat_integer > 90 ||
-        _loc->lng_integer < -90 || _loc->lng_integer > 90 ||
+        _loc->lng_integer < -180 || _loc->lng_integer > 180 ||
         _loc->lat_fractional < 0 || _loc->lat_fractional > 999999 ||
         _loc->lng_fractional < 0 || _loc->lng_fractional > 999999 ||
         _loc->accuracy < 0) {
@@ -54,7 +64,51 @@ long set_gps_location(struct gps_location __user *loc) {
     return 0;
 }
 
+long get_gps_location(const char __user *pathname, struct gps_location __user * loc) {
+    struct filename *tmp;
+    struct gps_location *_loc;
+    struct path path;
+    struct inode *inode;
+    int error = 0;
+
+
+    if (pathname == NULL || loc == NULL) return -EFAULT;
+
+    // from open() syscall
+    tmp = getname(pathname);
+	if (IS_ERR(tmp))
+		return PTR_ERR(tmp);
+
+    error = kern_path(tmp->name, 0, &path);
+    if (error) {
+        return -EFAULT;
+    }
+
+    inode = path.dentry->d_inode;
+
+    if (!inode->i_op->get_gps_location) {
+        return -ENODEV;
+    }
+
+    _loc = (struct gps_location *)kmalloc(sizeof(struct gps_location), GFP_KERNEL);
+    inode->i_op->get_gps_location(inode, _loc);
+    
+    error = copy_to_user(_loc, loc, sizeof(struct gps_location));
+    kfree(_loc);
+
+    if (error) {
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
 SYSCALL_DEFINE1(set_gps_location, struct gps_location __user *, loc)
 {
     return set_gps_location(loc);
+}
+
+SYSCALL_DEFINE2(get_gps_location, const char __user *, pathname, struct gps_location __user *, loc)
+{
+    return get_gps_location(pathname, loc);
 }
