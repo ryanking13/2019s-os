@@ -161,6 +161,29 @@ int ext2_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 	return ret;
 }
 
+int ext2_set_gps_location(struct inode *inode) {
+	struct ext2_inode_info *ei = EXT2_I(inode);
+	struct gps_location *loc = &init_location;
+	location_lock();
+	ei->i_lat_integer = (__u32)LAT_TO_U32(loc->lat_integer);
+	ei->i_lng_integer = (__u32)LNG_TO_U32(loc->lng_integer);
+	ei->i_lat_fractional = (__u32)loc->lat_fractional;
+	ei->i_lng_fractional = (__u32)loc->lng_fractional;
+	ei->i_accuracy = (__u32)loc->accuracy;
+	location_unlock();
+	return 0;
+}
+
+int ext2_get_gps_location(struct inode *inode, struct gps_location *loc) {
+	struct ext2_inode_info *ei = EXT2_I(inode);
+	loc->lat_integer = U32_TO_LAT((int)ei->i_lat_integer);
+	loc->lng_integer = U32_TO_LNG((int)ei->i_lng_integer);
+	loc->lat_fractional = (int)ei->i_lat_fractional;
+	loc->lng_fractional = (int)ei->i_lng_fractional;
+	loc->accuracy = (int)ei->i_accuracy;
+	return 0;
+}
+
 static ssize_t ext2_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
 #ifdef CONFIG_FS_DAX
@@ -204,4 +227,7 @@ const struct inode_operations ext2_file_inode_operations = {
 	.get_acl	= ext2_get_acl,
 	.set_acl	= ext2_set_acl,
 	.fiemap		= ext2_fiemap,
+	/* OS Project 4 */
+	.set_gps_location = ext2_set_gps_location,
+	.get_gps_location = ext2_get_gps_location,
 };
