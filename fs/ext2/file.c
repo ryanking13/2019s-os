@@ -171,6 +171,7 @@ int ext2_set_gps_location(struct inode *inode) {
 	ei->i_lng_fractional = (__u32)loc->lng_fractional;
 	ei->i_accuracy = (__u32)loc->accuracy;
 	location_unlock();
+	// printk(KERN_INFO "called set_gps_location\n");
 	return 0;
 }
 
@@ -181,7 +182,20 @@ int ext2_get_gps_location(struct inode *inode, struct gps_location *loc) {
 	loc->lat_fractional = (int)ei->i_lat_fractional;
 	loc->lng_fractional = (int)ei->i_lng_fractional;
 	loc->accuracy = (int)ei->i_accuracy;
+	// printk(KERN_INFO "called get_gps_location\n");
 	return 0;
+}
+
+int ext2_permission(struct inode *inode, int mask) {
+	struct gps_location loc;
+	ext2_get_gps_location(inode, &loc);
+
+	// printk(KERN_INFO "ext2_permission called\n");
+	if (!can_access_here(&loc)) {
+		return -EPERM;
+	}
+
+	return generic_permission(inode, mask);
 }
 
 static ssize_t ext2_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
@@ -230,4 +244,5 @@ const struct inode_operations ext2_file_inode_operations = {
 	/* OS Project 4 */
 	.set_gps_location = ext2_set_gps_location,
 	.get_gps_location = ext2_get_gps_location,
+	.permission = ext2_permission,
 };

@@ -23,10 +23,12 @@ void location_unlock(void) {
 int can_access_here(struct gps_location *file_loc) {
     int ret = 1;
     struct gps_location *here = &init_location;
+    // printk(KERN_INFO "checking access");
     location_lock();
-    // TODO
+    // TODO: distance calculation
+    if (here->lat_integer - file_loc->lat_integer > 10) ret = 0;
     location_unlock();
-    return 1;
+    return ret;
 }
 
 long set_gps_location(struct gps_location __user *loc) {
@@ -71,32 +73,42 @@ long get_gps_location(const char __user *pathname, struct gps_location __user * 
     struct inode *inode;
     int error = 0;
 
-
     if (pathname == NULL || loc == NULL) return -EFAULT;
 
     // from open() syscall
     tmp = getname(pathname);
-	if (IS_ERR(tmp))
+	if (IS_ERR(tmp)) {
+        // printk(KERN_INFO "getname failed\n");
 		return PTR_ERR(tmp);
+    }
 
     error = kern_path(tmp->name, 0, &path);
     if (error) {
+        // printk(KERN_INFO "kern_path failed\n");
         return -EFAULT;
     }
 
     inode = path.dentry->d_inode;
 
+    // check fs/namei.c and fs/open.c
+    if (inode_permission(inode, MAY_READ)) {
+        // printk(KERN_INFO "inode_permission failed\n");
+        return -EACCES;
+    }
+
     if (!inode->i_op->get_gps_location) {
+        // printk(KERN_INFO "get_gps_location not exists\n");
         return -ENODEV;
     }
 
     _loc = (struct gps_location *)kmalloc(sizeof(struct gps_location), GFP_KERNEL);
     inode->i_op->get_gps_location(inode, _loc);
     
-    error = copy_to_user(_loc, loc, sizeof(struct gps_location));
+    error = copy_to_user(loc, _loc, sizeof(struct gps_location));
     kfree(_loc);
 
     if (error) {
+        // printk(KERN_INFO "copy_to_user failed\n");
         return -EFAULT;
     }
 

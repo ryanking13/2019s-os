@@ -432,19 +432,6 @@ EXPORT_SYMBOL(kernel_read);
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
 	ssize_t ret;
-	/* OS Project 4 */
-	struct inode *inode;
-	inode = file->f_inode;
-	// only modified ext2 have this function pointer
-	if (inode->i_op->get_gps_location) {
-		struct gps_location loc;
-		inode->i_op->get_gps_location(inode, &loc);
-		
-		if (!can_access_here(&loc)) {
-			return -EINVAL;
-		}
-	}
-	//////////////////
 
 	if (!(file->f_mode & FMODE_READ))
 		return -EBADF;

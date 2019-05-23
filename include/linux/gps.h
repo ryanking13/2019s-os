@@ -15,12 +15,13 @@
 #define U32_TO_LAT(x) (x - 90)
 #define U32_TO_LNG(x) (x - 180)
 
-// (meter) THIS VALUE IS FROM NASA :)
-#define EARTH_CIRCUMFERENCE 40030000 
-// (meter) distance per 1 lat/lng difference
-#define UNIT_DISTANCE 111195
-// (micrometer) didstance per 1 * 1e-6 lat/lng difference
-#define UNIT_DISTANCE_MM (UNIT_DISTANCE * 1e6)
+// you can use this, or not.
+// // (meter) THIS VALUE IS FROM NASA :)
+// #define EARTH_CIRCUMFERENCE 40030000 
+// // (meter) distance per 1 lat/lng difference
+// #define UNIT_DISTANCE 111195
+// // (micrometer) didstance per 1 * 1e-6 lat/lng difference
+// #define UNIT_DISTANCE_MM (UNIT_DISTANCE * 1e6)
 
 struct gps_location {
   int lat_integer;
