@@ -102,5 +102,6 @@ test/*
 !/test/*.c
 !/test/*.tar.gz
 !/test/*.sh
+!/test/*.fs
 tizen-image
 *.img

@@ -7,7 +7,7 @@
 #include <linux/gps.h>
 
 #define SET_GPS_LOCATION(loc) syscall(398, loc)
-#define GET_GPS_LOCATION(path, loc) syscall(398, path, loc)
+#define GET_GPS_LOCATION(path, loc) syscall(399, path, loc)
 
 int main(int argc, char **argv) {
 
@@ -30,6 +30,6 @@ int main(int argc, char **argv) {
     printf("Latitude: %d.%d\n", loc.lat_integer, loc.lat_fractional);
     printf("Longitude: %d.%d\n", loc.lng_integer, loc.lng_fractional);
     printf("Accuracy: %d\n", loc.accuracy);
-    printf("https://www.google.com/maps/@%d.%d,%d.%d\n", loc.lat_integer, loc.lat_fractional, loc.lng_integer, loc.lng_fractional);
+    printf("http://maps.google.com/maps?q=%d.%d,%d.%d\n", loc.lat_integer, loc.lat_fractional, loc.lng_integer, loc.lng_fractional);
     return 0;
 }
