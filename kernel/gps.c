@@ -91,7 +91,7 @@ long get_gps_location(const char __user *pathname, struct gps_location __user * 
     inode = path.dentry->d_inode;
 
     // check fs/namei.c and fs/open.c
-    if (inode_permission(inode, MAY_READ)) {
+    if (inode_permission(inode, MAY_READ | MAY_GET_LOCATION)) {
         // printk(KERN_INFO "inode_permission failed\n");
         return -EACCES;
     }

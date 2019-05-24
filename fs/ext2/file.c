@@ -191,7 +191,9 @@ int ext2_permission(struct inode *inode, int mask) {
 	ext2_get_gps_location(inode, &loc);
 
 	// printk(KERN_INFO "ext2_permission called\n");
-	if (!can_access_here(&loc)) {
+
+	// gps_get_location() syscall must preceed, so check MAY_GET_LOCATION mask
+	if (!(mask & MAY_GET_LOCATION) && !can_access_here(&loc)) {
 		return -EPERM;
 	}
 
