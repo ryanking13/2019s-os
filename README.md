@@ -108,17 +108,47 @@ sudo ./build_test.py --eject    # eject sdcard after upload
   - `set_gps_location`, `get_gps_location` syscall 구현
   - locking, 거리 계산 등 기타 함수 구현
 
-### 2.2. Location struct, syscall
+### 2.2. Location struct
 
-### 2.3. EXT2 inode modification / updating location
+`gps_location` struct는 프로젝트 스펙과 동일하게 정의되었으며, global singleton instance 인 `init_location`이 device의 location을 나타낸다.
+
+`init_location`에 접근할 때는 spinlock을 사용하여 synchronization과 관련한 문제가 발생하지 않도록 하였다.
+
+
+### 2.3. Updating location
+
+EXT2 inode의 location 정보는 파일이 새롭게 생성되거나 (create), 수정될 때 (modify) 업데이트 되어야 한다.
+
+이를 위하여 새로운 파일이 생성되는 경우인 `ext2_create`와, 파일이 수정되는 경우인 `vfs_write` 함수에 각각 location을 업데이트하는 로직을 추가하였다.
 
 ### 2.4. Calculating distance
 
+__TODO__
+
 ## 3. Discussion
 
-#### Access restriction
+#### Location-based file access
 
-__TODO__
+프로젝트 스펙에서 요구하는 Location-based file access 를 구현하는 방법은 다양한데, 우리는 inode_operations 구조체의 `permission` 속성을 구현하여 사용하는 것을 선택하였다. `permission` 속성은 inode에 access 할 수 있는지 확인하는 데에 사용되는 `inode_permission` 함수 내부에서 호출되므로, 해당 속성을 사용하여 access restriction을 구현하는 것이 가장 표준적인 방법이라고 판단하였다.
+
+`permission` 속성의 구현체인 `ext2_permission` 함수는 아래와 같다. `can_access_here` 함수로 현대 device의 location과 파일의 location의 위치를 비교하여 access 가능 여부를 판단하고, 실패 시에는 에러를 리턴하며, 성공 시에는 이후의 검사를 수행(`generic_permission`) 수행한다.
+
+```c
+int ext2_permission(struct inode *inode, int mask) {
+	struct gps_location loc;
+	ext2_get_gps_location(inode, &loc);
+
+	// gps_get_location() syscall must preceed, so check MAY_GET_LOCATION mask
+	if (!(mask & MAY_GET_LOCATION) && !can_access_here(&loc)) {
+		return -EPERM;
+	}
+
+	return generic_permission(inode, mask);
+}
+```
+
+이 때, 이번 프로젝트에서 구현한 `get_gps_location` syscall의 경우에도 `inode_permission` 함수를 사용하여 해당 파일(inode)에 접근이 가능한지 확인하게 된다. `get_gps_location`의 경우는 파일의 location과는 무관하게 access 가능 여부를 판단하여야 하므로, `get_gps_location` 에서만 사용하는 `MAY_GET_LOCATION` mask를 정의하여, `get_gps_location`에서는 파일의 location을 검사하지 않도록 하였다.
+
 
 ## 4. Test code
 
