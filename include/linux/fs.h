@@ -675,13 +675,6 @@ struct inode {
 #endif
 
 	void			*i_private; /* fs or device private pointer */
-
-	/* OS Project 4 */
-	__s32				i_lat_integer;
-	__s32				i_lat_fractional;
-	__s32				i_lng_interger;
-	__s32				i_lng_fractional;
-	__s32				i_accuracy;
 } __randomize_layout;
 
 static inline unsigned int i_blocksize(const struct inode *node)
