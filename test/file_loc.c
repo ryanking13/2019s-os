@@ -27,9 +27,9 @@ int main(int argc, char **argv) {
     }
 
     printf("GPS location information of: %s\n", argv[1]);
-    printf("Latitude: %d.%d\n", loc.lat_integer, loc.lat_fractional);
-    printf("Longitude: %d.%d\n", loc.lng_integer, loc.lng_fractional);
+    printf("Latitude: %d.%.6d\n", loc.lat_integer, loc.lat_fractional);
+    printf("Longitude: %d.%.6d\n", loc.lng_integer, loc.lng_fractional);
     printf("Accuracy: %d\n", loc.accuracy);
-    printf("http://maps.google.com/maps?q=%d.%d,%d.%d\n", loc.lat_integer, loc.lat_fractional, loc.lng_integer, loc.lng_fractional);
+    printf("http://maps.google.com/maps?q=%d.%.6d,%d.%.6d\n", loc.lat_integer, loc.lat_fractional, loc.lng_integer, loc.lng_fractional);
     return 0;
 }
