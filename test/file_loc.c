@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <linux/gps.h>
+#include <errno.h>
 
 #define SET_GPS_LOCATION(loc) syscall(398, loc)
 #define GET_GPS_LOCATION(path, loc) syscall(399, path, loc)
@@ -21,7 +22,7 @@ int main(int argc, char **argv) {
     int ret = GET_GPS_LOCATION(argv[1], &loc);
 
     if (ret < 0) {
-        printf("Getting GPS location failed\n");
+        printf("Getting GPS location failed, errno = %d\n", errno);
         printf("Please check arguments\n");
         return 1;
     }
