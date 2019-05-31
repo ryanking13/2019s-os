@@ -548,6 +548,17 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 		}
 		inc_syscw(current);
 		file_end_write(file);
+		/* OS Project 4 */
+		if (file->f_inode) {
+			struct inode *inode = file->f_inode;
+			// only modified ext2 has this function pointer
+			if (inode->i_op->set_gps_location) {
+				inode->i_op->set_gps_location(inode);
+			}
+		} else {
+			printk(KERN_INFO "f_inode is null");
+		}
+		//////////////////
 	}
 
 	return ret;
