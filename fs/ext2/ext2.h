@@ -356,6 +356,7 @@ struct ext2_inode {
 	__le32 i_lat_fractional;
 	__le32 i_lng_integer;
 	__le32 i_lng_fractional;
+	__le32 i_accuracy;
 };
 
 #define i_size_high	i_dir_acl
