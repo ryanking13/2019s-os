@@ -152,9 +152,35 @@ int ext2_permission(struct inode *inode, int mask) {
 
 ## 4. Test code
 
-__TODO__
+[proj4.fs](./proj4.fs) 파일을 마운트하여 테스트할 수 있음. (주의: `test/proj4.fs` 는 비어있음)
+
+__Directory structure of proj4.fs__
+
+_please ignore `lost+found`_
+
+- test
+  - tfile1
+  - tfile2
+
+```sh
+root:~> ./file_loc proj4/test/tfile1
+GPS location information of: proj4/test/tfile1
+Latitude: 12.000034
+Longitude: 56.000078
+Accuracy: 90
+http://maps.google.com/maps?q=12.000034,56.000078
+root:~> ./file_loc proj4/test/tfile2
+GPS location information of: proj4/test/tfile2
+Latitude: 90.000078
+Longitude: 56.000034
+Accuracy: 12
+http://maps.google.com/maps?q=90.000078,56.000034
+```
 
 ## 5. Lessons learned
+
+- 리눅스 시스템에서 파일을 표현하기 위하여 사용하는 inode에 대하여 이해함
+- 여러가지 파일 시스템을 공존시키기 위한 VFS 방식에 대해서 이해함
 
 ## 6. References
 
