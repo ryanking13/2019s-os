@@ -22,7 +22,7 @@ void location_unlock(void) {
 }
 
 int can_access_here(struct gps_location *file_loc) {
-    int ret = 1, distance_int;
+    int ret, distance_int;
     struct gps_location *curr_loc = &init_location;
     struct decimal_6 curr_lat, curr_lng, file_lat, file_lng, distance;
     location_lock();

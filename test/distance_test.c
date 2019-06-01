@@ -35,6 +35,12 @@ int main() {
     ret = system("echo 12341234 > proj4/dist1");
     if (ret != 0) { printf("FAIL: dist1 generation failed\n"); return 1; }
 
+    SET_GPS_LOCATION(&NAKSUNGDAE);
+    printf("I'm now in NAKSUNGDAE\n");
+
+    ret = system("echo 12341234 > proj4/dist1");
+    if (ret != 0) { printf("FAIL: dist1 generation failed\n"); return 1; }
+
     SET_GPS_LOCATION(&SULIP);
     printf("I'm now in SULIP\n");
 

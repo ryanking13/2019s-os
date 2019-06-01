@@ -2119,9 +2119,9 @@ struct decimal_6 sqrt_precision_dec6(struct decimal_6 number)
     struct decimal_6 mid, mid_p;
     if (x.integer==0)
     {
-        x.integer = 1;
         if (x.fractional ==0)
             return x;
+        x.integer = 1;
         x.fractional = 0;
     }
 
@@ -2157,7 +2157,7 @@ struct decimal_6 theta_between_dec6(struct decimal_6 a1, struct decimal_6 a2, st
             , mult_dec6(
                 sin_precision_dec6(a2)
                 , sin_precision_dec6(b2)));
-    if (t.fractional<850000)
+    if (t.integer!=1 && t.fractional<850000)
         return acos_precision_dec6(t);
     else
     {
