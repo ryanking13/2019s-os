@@ -6,6 +6,7 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/namei.h>
+#include "dec6.c"
 
 struct gps_location init_location = INIT_GPS_LOCATION(init_location);
 EXPORT_SYMBOL(init_location);
@@ -21,12 +22,23 @@ void location_unlock(void) {
 }
 
 int can_access_here(struct gps_location *file_loc) {
-    int ret = 1;
-    struct gps_location *here = &init_location;
-    // printk(KERN_INFO "checking access");
+    int ret, distance_int;
+    struct gps_location *curr_loc = &init_location;
+    struct decimal_6 curr_lat, curr_lng, file_lat, file_lng, distance;
     location_lock();
-    // TODO: distance calculation
-    if (here->lat_integer - file_loc->lat_integer > 10) ret = 0;
+    curr_lat.integer = curr_loc->lat_integer;
+    curr_lat.fractional = curr_loc->lat_fractional;
+    curr_lng.integer = curr_loc->lng_integer;
+    curr_lng.fractional = curr_loc->lng_fractional;
+    file_lat.integer = file_loc->lat_integer;
+    file_lat.fractional = file_loc->lat_fractional;
+    file_lng.integer = file_loc->lng_integer;
+    file_lng.fractional = file_loc->lng_fractional;
+    distance = get_distance_dec6(curr_lng,curr_lat,file_lng,file_lat);
+    distance_int = distance.integer * 1000 + distance.fractional/1000 * (1-2*(distance.integer<0));
+    if(distance_int < 0)
+        distance_int *=(-1);
+    ret = distance_int <=file_loc->accuracy + curr_loc->accuracy;
     location_unlock();
     return ret;
 }
