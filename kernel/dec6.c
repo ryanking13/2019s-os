@@ -2115,7 +2115,7 @@ struct decimal_6 sqrt_precision_dec6(struct decimal_6 number)
 {
     struct decimal_6 x = number;
     struct decimal_6 y = {0,0};
-    struct decimal_6 s = x;
+    struct decimal_6 s;
     struct decimal_6 mid, mid_p;
     if (x.integer==0)
     {
@@ -2124,6 +2124,7 @@ struct decimal_6 sqrt_precision_dec6(struct decimal_6 number)
         x.integer = 1;
         x.fractional = 0;
     }
+    s = x;
 
     while((s64)s.integer*1000000 + s.fractional > 1)
     {
@@ -2194,5 +2195,25 @@ struct decimal_6 theta_between_dec6(struct decimal_6 a1, struct decimal_6 a2, st
 struct decimal_6 get_distance_dec6(struct decimal_6 a1, struct decimal_6 a2, struct decimal_6 b1, struct decimal_6 b2)
 {
     struct decimal_6 radii = {6371,0};
-    return mult_dec6(radii, theta_between_dec6(a1,a2,b1,b2));
+    struct decimal_6 c2 = {3,141592};
+    struct decimal_6 c3 = {63710,0};
+    struct decimal_6 t1,t2,result;
+    struct decimal_6 theta = theta_between_dec6(a1,a2,b1,b2);
+    int c = 1800;
+    if(theta.integer==0 && theta.fractional==0)
+    {
+        t1 = mult_dec6(sum_dec6(a1,neg_dec6(b1)),c3);
+        t1 = mult_dec6(t1,t1);
+        t2 = mult_dec6(sum_dec6(a2,neg_dec6(b2)),c3);
+        t2 = mult_dec6(t2,t2);
+        result = div_int_dec6(
+                    mult_dec6(
+                        sqrt_precision_dec6(
+                            sum_dec6(t1,t2))
+                        , c2)
+                    , c);
+        return result;
+    }
+    else
+        return mult_dec6(radii, theta_between_dec6(a1,a2,b1,b2));
 }
