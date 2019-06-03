@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     loc.lat_integer = 91;
     ret = SET_GPS_LOCATION(&loc);
     if (ret >= 0) { printf("FAIL: lat_integer = %d, return code %d\n", loc.lat_integer, ret); return 1; }
-    
+
     loc.lat_integer = 0;
 
     ////////////////////
@@ -94,6 +94,26 @@ int main(int argc, char **argv) {
     if (ret >= 0) { printf("FAIL: accuracy = %d, return code %d\n", loc.accuracy, ret); return 1; }
 
     loc.accuracy = 10;
+
+    /////////////////////
+
+    loc.lat_integer = 90;
+    loc.lat_fractional = 9999;
+    ret = SET_GPS_LOCATION(&loc);
+    if (ret >= 0) { printf("FAIL: lat_integer = %d, lat_fractional = %d, return code %d\n", loc.lat_integer, loc.lat_fractional, ret); return 1; }
+
+    loc.lat_integer = 0;
+    loc.lat_fractional = 0;
+
+    /////////////////////
+
+    loc.lng_integer = 180;
+    loc.lng_fractional = 9999;
+    ret = SET_GPS_LOCATION(&loc);
+    if (ret >= 0) { printf("FAIL: lng_integer = %d, lng_fractional = %d, return code %d\n", loc.lng_integer, loc.lng_fractional, ret); return 1; }
+
+    loc.lng_integer = 0;
+    loc.lng_fractional = 0;
 
     /////////////////////
 
@@ -149,7 +169,7 @@ int main(int argc, char **argv) {
     //////////////////////
 
     printf("Step 4: Checking get_gps_location() with valid parameter\n");
-    
+
     ret = GET_GPS_LOCATION("proj4/test1", &_loc);
     if (ret < 0) { printf("FAIL: failed to get gps location, return code %d\n", ret); return 1; }
 
