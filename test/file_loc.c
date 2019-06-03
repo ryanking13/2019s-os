@@ -28,9 +28,23 @@ int main(int argc, char **argv) {
     }
 
     printf("GPS location information of: %s\n", argv[1]);
-    printf("Latitude: %d.%.6d\n", loc.lat_integer, loc.lat_fractional);
-    printf("Longitude: %d.%.6d\n", loc.lng_integer, loc.lng_fractional);
+
+    char latitude[10];
+    char longitude[10];
+
+    if (loc.lat_integer < 0 && loc.lat_fractional > 0) {
+        sprintf(latitude, "%d.%.6d", loc.lat_integer + 1, 1000000 - loc.lat_fractional);
+    }
+    else sprintf(latitude, "%d.%.6d", loc.lat_integer, loc.lat_fractional);
+
+    if (loc.lng_integer < 0 && loc.lng_fractional > 0) {
+        sprintf(longitude, "%d.%.6d", loc.lng_integer + 1, 1000000 - loc.lng_fractional);
+    }
+    else sprintf(longitude, "%d.%.6d", loc.lng_integer, loc.lng_fractional);
+
+    printf("Latitude: %s\n", latitude);
+    printf("Longitude: %s\n", longitude);
     printf("Accuracy: %d\n", loc.accuracy);
-    printf("http://maps.google.com/maps?q=%d.%.6d,%d.%.6d\n", loc.lat_integer, loc.lat_fractional, loc.lng_integer, loc.lng_fractional);
+    printf("http://maps.google.com/maps?q=%s,%s\n", latitude, longitude);
     return 0;
 }
