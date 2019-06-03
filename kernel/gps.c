@@ -40,6 +40,7 @@ int can_access_here(struct gps_location *file_loc) {
         distance_int *=(-1);
     ret = distance_int <=file_loc->accuracy + curr_loc->accuracy;
     location_unlock();
+    // printk(KERN_INFO "dist: %d\n", distance_int);
     return ret;
 }
 
