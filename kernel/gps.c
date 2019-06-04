@@ -68,7 +68,7 @@ long set_gps_location(struct gps_location __user *loc) {
     }
 
     if ( (_loc->lat_integer == 90 && _loc->lat_fractional > 0) ||
-         (_loc->lng_integer == 90 && _loc->lng_fractional > 0)) {
+         (_loc->lng_integer == 180 && _loc->lng_fractional > 0)) {
         kfree(_loc);
         return -EINVAL;
     }
